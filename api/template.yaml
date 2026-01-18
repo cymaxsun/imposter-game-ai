@@ -1,0 +1,133 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Imposter Game API - Generate words using Gemini AI v4 (App Attest only, no Cognito)
+
+Globals:
+  Function:
+    Timeout: 30
+    Runtime: nodejs20.x
+    MemorySize: 256
+
+Resources:
+  ImposterGameApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: Prod
+      Cors:
+        AllowMethods: "'GET,OPTIONS,POST'"
+        AllowHeaders: "'Content-Type,X-App-Attest,Authorization'"
+        AllowOrigin: "'*'"
+
+  GenerateWordsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: generate-words.handler
+      Environment:
+        Variables:
+          GEMINI_API_KEY: !Ref GeminiApiKey
+          ENFORCE_ATTESTATION: 'true'
+          JWT_SECRET: !Ref JwtSecret
+      Events:
+        GenerateWords:
+          Type: Api
+          Properties:
+            Path: /api/generate-words
+            Method: POST
+            RestApiId: !Ref ImposterGameApi
+        GenerateWordsOptions:
+          Type: Api
+          Properties:
+            Path: /api/generate-words
+            Method: OPTIONS
+            RestApiId: !Ref ImposterGameApi
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2020
+        External:
+          - aws-sdk
+        EntryPoints:
+          - generate-words.js
+
+  AuthFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: auth-handler.verifyDeviceHandler
+      Environment:
+        Variables:
+          JWT_SECRET: !Ref JwtSecret
+      Events:
+        VerifyDevice:
+          Type: Api
+          Properties:
+            Path: /api/auth/verify-device
+            Method: POST
+            RestApiId: !Ref ImposterGameApi
+        VerifyDeviceOptions:
+          Type: Api
+          Properties:
+            Path: /api/auth/verify-device
+            Method: OPTIONS
+            RestApiId: !Ref ImposterGameApi
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2020
+        External:
+          - aws-sdk
+        EntryPoints:
+          - auth-handler.js
+
+  ChallengeFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: challenge.handler
+      Events:
+        GetChallenge:
+          Type: Api
+          Properties:
+            Path: /api/challenge
+            Method: GET
+            RestApiId: !Ref ImposterGameApi
+        ChallengeOptions:
+          Type: Api
+          Properties:
+            Path: /api/challenge
+            Method: OPTIONS
+            RestApiId: !Ref ImposterGameApi
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2020
+        External:
+          - aws-sdk
+        EntryPoints:
+          - challenge.js
+
+Parameters:
+  GeminiApiKey:
+    Type: String
+    Description: API key for Google Gemini
+    NoEcho: true
+  JwtSecret:
+    Type: String
+    Description: Secret key for signing session JWTs
+    Default: 'change-this-in-procution-to-a-proper-secret'
+    NoEcho: true
+
+Outputs:
+  ApiEndpoint:
+    Description: API Gateway endpoint URL
+    Value: !Sub "https://${ImposterGameApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/api/generate-words"
+  ChallengeEndpoint:
+    Description: Challenge endpoint for App Attest
+    Value: !Sub "https://${ImposterGameApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/api/challenge"
+  AuthEndpoint:
+    Description: Auth handshake endpoint
+    Value: !Sub "https://${ImposterGameApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/api/auth/verify-device"

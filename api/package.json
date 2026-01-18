@@ -1,0 +1,18 @@
+{
+  "name": "imposter-finder-api",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "build": "sam build",
+    "deploy": "sam deploy",
+    "deploy:guided": "sam deploy --guided",
+    "validate": "sam validate"
+  },
+  "dependencies": {
+    "@google/genai": "^1.35.0",
+    "jsonwebtoken": "^9.0.3"
+  },
+  "devDependencies": {
+    "esbuild": "^0.20.0"
+  }
+}

@@ -1,0 +1,9 @@
+{
+    "body": "{\"topic\": \"local test\"}",
+    "httpMethod": "POST",
+    "requestContext": {
+        "http": {
+            "method": "POST"
+        }
+    }
+}
