@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'game_screen.dart';
+import '../theme/app_theme.dart';
 import 'manage_categories_screen.dart';
 
 /// Stitch-inspired setup screen with pastel colors and friendly layout.
@@ -239,6 +240,8 @@ class _SetupScreenState extends State<SetupScreen> {
     const aiAccent = Color(0xFFBA68C8);
     const iosBg = Color(0xFFF8FAFC);
 
+    final textTheme = Theme.of(context).textTheme;
+
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
@@ -267,8 +270,7 @@ class _SetupScreenState extends State<SetupScreen> {
                   ),
                   title: Text(
                     'Imposter Finder',
-                    style: TextStyle(
-                      fontSize: 20,
+                    style: textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: textMain,
                     ),
@@ -318,10 +320,9 @@ class _SetupScreenState extends State<SetupScreen> {
                                 const SizedBox(width: 6),
                                 Text(
                                   'AI Studio',
-                                  style: TextStyle(
+                                  style: textTheme.labelSmall?.copyWith(
                                     color: aiAccent,
                                     fontWeight: FontWeight.bold,
-                                    fontSize: 12,
                                   ),
                                 ),
                                 const SizedBox(width: 4),
@@ -360,10 +361,9 @@ class _SetupScreenState extends State<SetupScreen> {
                           ),
                           child: Text(
                             'MIN 3 PLAYERS',
-                            style: TextStyle(
+                            style: textTheme.labelSmall?.copyWith(
                               color: blueAccent,
                               fontWeight: FontWeight.bold,
-                              fontSize: 10,
                               letterSpacing: 0.5,
                             ),
                           ),
@@ -462,7 +462,7 @@ class _SetupScreenState extends State<SetupScreen> {
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(
+                              const Icon(
                                 Icons.play_circle_filled,
                                 color: Colors.white,
                                 size: 28,
@@ -470,9 +470,8 @@ class _SetupScreenState extends State<SetupScreen> {
                               const SizedBox(width: 12),
                               Text(
                                 'START GAME',
-                                style: TextStyle(
+                                style: textTheme.titleMedium?.copyWith(
                                   color: Colors.white,
-                                  fontSize: 18,
                                   fontWeight: FontWeight.bold,
                                   letterSpacing: 0.5,
                                 ),
@@ -497,6 +496,8 @@ class _SetupScreenState extends State<SetupScreen> {
     String title, {
     Widget? trailing,
   }) {
+    final textTheme = Theme.of(context).textTheme;
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -504,10 +505,9 @@ class _SetupScreenState extends State<SetupScreen> {
           padding: const EdgeInsets.only(left: 8),
           child: Text(
             title,
-            style: const TextStyle(
-              fontSize: 18,
+            style: textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.bold,
-              color: Color(0xFF455A64),
+              color: const Color(0xFF455A64),
             ),
           ),
         ),
@@ -522,6 +522,7 @@ class _SetupScreenState extends State<SetupScreen> {
     required Color blueAccent,
     required Color textMain,
   }) {
+    final textTheme = Theme.of(context).textTheme;
     final selectedCategory = _selectedCategories.first;
     final icon = _categoryIcons[selectedCategory] ?? Icons.category;
 
@@ -558,12 +559,9 @@ class _SetupScreenState extends State<SetupScreen> {
                 children: [
                   Text(
                     'CURRENT SELECTION',
-                    style: TextStyle(
-                      fontSize: 6,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey.shade400,
-                      letterSpacing: 1,
-                    ),
+                    style: Theme.of(
+                      context,
+                    ).extension<CustomTypography>()?.extraSmallLabel,
                   ),
                   const SizedBox(height: 4),
                   LayoutBuilder(
@@ -571,8 +569,7 @@ class _SetupScreenState extends State<SetupScreen> {
                       final text = _selectedCategories.length == 1
                           ? selectedCategory
                           : '${_selectedCategories.length} Categories';
-                      final textStyle = TextStyle(
-                        fontSize: 16,
+                      final textStyle = textTheme.bodyLarge?.copyWith(
                         fontWeight: FontWeight.bold,
                         color: textMain,
                       );
@@ -597,7 +594,7 @@ class _SetupScreenState extends State<SetupScreen> {
                       if (hasOverflow) {
                         return ShaderMask(
                           shaderCallback: (Rect bounds) {
-                            return LinearGradient(
+                            return const LinearGradient(
                               begin: Alignment.centerLeft,
                               end: Alignment.centerRight,
                               colors: [Colors.black, Colors.transparent],
@@ -615,8 +612,7 @@ class _SetupScreenState extends State<SetupScreen> {
                   const SizedBox(height: 2),
                   Text(
                     'Change category...',
-                    style: TextStyle(
-                      fontSize: 6,
+                    style: textTheme.labelSmall?.copyWith(
                       fontWeight: FontWeight.w600,
                       color: blueAccent,
                     ),
@@ -631,7 +627,11 @@ class _SetupScreenState extends State<SetupScreen> {
                 color: Colors.grey.shade50,
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: Icon(Icons.chevron_right, color: Colors.grey.shade300),
+              child: Icon(
+                Icons.chevron_right,
+                color: Colors.grey.shade300,
+                size: 24,
+              ),
             ),
           ],
         ),
@@ -667,6 +667,7 @@ class _SetupScreenState extends State<SetupScreen> {
     required Color mint,
     required Color textMain,
   }) {
+    final textTheme = Theme.of(context).textTheme;
     final colors = [softPink, softBlue, mint];
 
     return Column(
@@ -723,8 +724,7 @@ class _SetupScreenState extends State<SetupScreen> {
                       isDense: true,
                       contentPadding: EdgeInsets.zero,
                     ),
-                    style: TextStyle(
-                      fontSize: 16,
+                    style: textTheme.bodyLarge?.copyWith(
                       fontWeight: FontWeight.w600,
                       color: textMain,
                     ),
@@ -762,11 +762,11 @@ class _SetupScreenState extends State<SetupScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.add_circle, color: Colors.grey.shade400),
+                  Icon(Icons.add_circle, color: Colors.grey.shade400, size: 24),
                   const SizedBox(width: 8),
                   Text(
                     'Add Player',
-                    style: TextStyle(
+                    style: textTheme.bodyMedium?.copyWith(
                       color: Colors.grey.shade400,
                       fontWeight: FontWeight.bold,
                     ),
@@ -785,6 +785,7 @@ class _SetupScreenState extends State<SetupScreen> {
     required Color textMain,
   }) {
     final maxImposters = _playerCount;
+    final textTheme = Theme.of(context).textTheme;
 
     return Container(
       padding: const EdgeInsets.all(24),
@@ -814,8 +815,7 @@ class _SetupScreenState extends State<SetupScreen> {
                 child: Center(
                   child: Text(
                     _randomizeImposters ? '?' : '$_imposterCount',
-                    style: TextStyle(
-                      fontSize: 24,
+                    style: textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: Colors.pink.shade400,
                     ),
@@ -824,8 +824,7 @@ class _SetupScreenState extends State<SetupScreen> {
               ),
               Text(
                 _getImposterHint(),
-                style: TextStyle(
-                  fontSize: 14,
+                style: textTheme.bodyMedium?.copyWith(
                   color: Colors.grey.shade400,
                   fontStyle: FontStyle.italic,
                 ),
@@ -862,8 +861,7 @@ class _SetupScreenState extends State<SetupScreen> {
                 maxImposters + 1,
                 (i) => Text(
                   '$i',
-                  style: TextStyle(
-                    fontSize: 12,
+                  style: textTheme.labelSmall?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: Colors.grey.shade300,
                   ),
@@ -892,6 +890,7 @@ class _SetupScreenState extends State<SetupScreen> {
     return Column(
       children: [
         _buildToggleCard(
+          context,
           title: 'Randomize Imposters',
           description: 'Let fate decide the imposter count',
           isEnabled: _randomizeImposters,
@@ -901,6 +900,7 @@ class _SetupScreenState extends State<SetupScreen> {
         ),
         const SizedBox(height: 12),
         _buildToggleCard(
+          context,
           title: 'Odd One Out',
           description: "Everyone gets a word! Find the odd one(s) out!",
           isEnabled: _useDecoyWord,
@@ -910,6 +910,7 @@ class _SetupScreenState extends State<SetupScreen> {
         ),
         const SizedBox(height: 12),
         _buildToggleCard(
+          context,
           title: 'Imposter Hints',
           description: 'Show category hints to imposters',
           isEnabled: _showImposterHints,
@@ -921,7 +922,8 @@ class _SetupScreenState extends State<SetupScreen> {
     );
   }
 
-  Widget _buildToggleCard({
+  Widget _buildToggleCard(
+    BuildContext context, {
     required String title,
     required String description,
     required bool isEnabled,
@@ -929,6 +931,8 @@ class _SetupScreenState extends State<SetupScreen> {
     required Color activeColor,
     required Color textMain,
   }) {
+    final textTheme = Theme.of(context).textTheme;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -950,7 +954,7 @@ class _SetupScreenState extends State<SetupScreen> {
               children: [
                 Text(
                   title,
-                  style: TextStyle(
+                  style: textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: textMain,
                   ),
@@ -958,7 +962,9 @@ class _SetupScreenState extends State<SetupScreen> {
                 const SizedBox(height: 2),
                 Text(
                   description,
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade400),
+                  style: textTheme.labelSmall?.copyWith(
+                    color: Colors.grey.shade400,
+                  ),
                 ),
               ],
             ),
@@ -1006,6 +1012,8 @@ class _SetupScreenState extends State<SetupScreen> {
     required Color yellowAccent,
     required Color textMain,
   }) {
+    final textTheme = Theme.of(context).textTheme;
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -1043,8 +1051,7 @@ class _SetupScreenState extends State<SetupScreen> {
                   _timeLimitSeconds == 0
                       ? 'No Limit'
                       : '${_timeLimitSeconds ~/ 60}:${(_timeLimitSeconds % 60).toString().padLeft(2, '0')}',
-                  style: TextStyle(
-                    fontSize: 16,
+                  style: textTheme.bodyLarge?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: textMain,
                   ),
@@ -1052,8 +1059,7 @@ class _SetupScreenState extends State<SetupScreen> {
                 if (_timeLimitSeconds > 0)
                   Text(
                     'MINUTES',
-                    style: TextStyle(
-                      fontSize: 8,
+                    style: textTheme.labelSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: Colors.grey.shade400,
                       letterSpacing: 1,
@@ -1065,6 +1071,7 @@ class _SetupScreenState extends State<SetupScreen> {
           Row(
             children: [
               _buildTimeButton(
+                context,
                 icon: Icons.remove,
                 onTap: () {
                   final times = [0, 60, 120, 180, 300];
@@ -1077,6 +1084,7 @@ class _SetupScreenState extends State<SetupScreen> {
               ),
               const SizedBox(width: 8),
               _buildTimeButton(
+                context,
                 icon: Icons.add,
                 onTap: () {
                   final times = [0, 60, 120, 180, 300];
@@ -1094,7 +1102,8 @@ class _SetupScreenState extends State<SetupScreen> {
     );
   }
 
-  Widget _buildTimeButton({
+  Widget _buildTimeButton(
+    BuildContext context, {
     required IconData icon,
     required VoidCallback onTap,
     required Color yellowAccent,
@@ -1130,18 +1139,19 @@ class _CategorySelectionSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
     return Container(
       padding: const EdgeInsets.all(24),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Select Categories',
-            style: TextStyle(
-              fontSize: 20,
+            style: textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.bold,
-              color: Color(0xFF455A64),
+              color: const Color(0xFF455A64),
             ),
           ),
           const SizedBox(height: 16),
@@ -1173,14 +1183,14 @@ class _CategorySelectionSheet extends StatelessWidget {
                     ),
                     child: Row(
                       children: [
-                        Icon(icon, color: const Color(0xFF455A64)),
+                        Icon(icon, color: const Color(0xFF455A64), size: 24),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
                             category,
-                            style: const TextStyle(
+                            style: textTheme.bodyLarge?.copyWith(
                               fontWeight: FontWeight.w600,
-                              color: Color(0xFF455A64),
+                              color: const Color(0xFF455A64),
                             ),
                           ),
                         ),
@@ -1188,11 +1198,10 @@ class _CategorySelectionSheet extends StatelessWidget {
                           const Icon(
                             Icons.check_circle,
                             color: Color(0xFF90CAF9),
+                            size: 24,
                           )
                         else
-                          const SizedBox(
-                            width: 24,
-                          ), // Consistent spacing even when not selected
+                          const SizedBox(width: 24),
                       ],
                     ),
                   ),

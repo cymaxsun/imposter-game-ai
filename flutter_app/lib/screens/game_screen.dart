@@ -65,6 +65,7 @@ class GameScreenConstants {
   static const int roleTitleFlex = 2;
   static const int subtitleFlex = 1;
   static const int wordBoxFlex = 3;
+  static const double scrollBottomPadding = 80.0;
 }
 
 /// The main game screen where players view their roles.
@@ -1025,208 +1026,193 @@ class _DiscussionViewState extends State<_DiscussionView>
                               key: const ValueKey('revealed'),
                               animation: _revealAnimation,
                               builder: (context, child) {
-                                return SingleChildScrollView(
-                                  padding: const EdgeInsets.only(bottom: 80),
-
-                                  child: Container(
-                                    width: double.infinity,
-                                    padding: const EdgeInsets.all(24),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(24),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black.withValues(
-                                            alpha: 0.08,
-                                          ),
-                                          blurRadius: 20,
-                                          offset: const Offset(0, 8),
-                                        ),
-                                      ],
+                                return Center(
+                                  child: SingleChildScrollView(
+                                    padding: const EdgeInsets.only(
+                                      bottom: GameScreenConstants
+                                          .scrollBottomPadding,
                                     ),
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        // "The Imposters were..." title
-                                        Opacity(
-                                          opacity: Interval(
-                                            0.0,
-                                            0.4,
-                                            curve: Curves.easeOut,
-                                          ).transform(_revealController.value),
-                                          child: Text(
-                                            widget.imposterNames.length == 1
-                                                ? 'The Imposter\nwas...'
-                                                : 'The Imposters\nwere...',
-                                            style: textTheme.headlineMedium
-                                                ?.copyWith(
-                                                  fontWeight: FontWeight.bold,
-                                                  color: colorScheme.onSurface,
-                                                  height: 1.2,
-                                                ),
-                                            textAlign: TextAlign.center,
+
+                                    child: Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.all(24),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(24),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withValues(
+                                              alpha: 0.08,
+                                            ),
+                                            blurRadius: 20,
+                                            offset: const Offset(0, 8),
                                           ),
-                                        ),
-                                        const SizedBox(height: 24),
-
-                                        // Imposter cards
-                                        ...widget.imposterNames.asMap().entries.map((
-                                          entry,
-                                        ) {
-                                          final index = entry.key;
-                                          final name = entry.value;
-
-                                          return Opacity(
+                                        ],
+                                      ),
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          // "The Imposters were..." title
+                                          Opacity(
                                             opacity:
                                                 Interval(
-                                                  (0.2 + (index * 0.05)).clamp(
-                                                    0.0,
-                                                    0.9,
-                                                  ),
-                                                  (0.5 + (index * 0.05)).clamp(
-                                                    0.1,
-                                                    1.0,
-                                                  ),
+                                                  0.0,
+                                                  0.4,
                                                   curve: Curves.easeOut,
                                                 ).transform(
                                                   _revealController.value,
                                                 ),
-                                            child: Transform.scale(
-                                              scale:
+                                            child: Text(
+                                              widget.imposterNames.length == 1
+                                                  ? 'The Imposter\nwas...'
+                                                  : 'The Imposters\nwere...',
+                                              style: textTheme.headlineMedium
+                                                  ?.copyWith(
+                                                    fontWeight: FontWeight.bold,
+                                                    color:
+                                                        colorScheme.onSurface,
+                                                    height: 1.2,
+                                                  ),
+                                              textAlign: TextAlign.center,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 24),
+
+                                          // Imposter cards
+                                          ...widget.imposterNames.asMap().entries.map((
+                                            entry,
+                                          ) {
+                                            final index = entry.key;
+                                            final name = entry.value;
+
+                                            return Opacity(
+                                              opacity:
                                                   Interval(
                                                     (0.2 + (index * 0.05))
                                                         .clamp(0.0, 0.9),
-                                                    (0.6 + (index * 0.05))
+                                                    (0.5 + (index * 0.05))
                                                         .clamp(0.1, 1.0),
-                                                    curve: Curves.elasticOut,
+                                                    curve: Curves.easeOut,
                                                   ).transform(
                                                     _revealController.value,
                                                   ),
-                                              child: Container(
-                                                margin: EdgeInsets.only(
-                                                  bottom:
-                                                      index <
-                                                          widget
-                                                                  .imposterNames
-                                                                  .length -
-                                                              1
-                                                      ? 8
-                                                      : 0,
-                                                ),
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                      horizontal: 12,
-                                                      vertical: 10,
+                                              child: Transform.scale(
+                                                scale:
+                                                    Interval(
+                                                      (0.2 + (index * 0.05))
+                                                          .clamp(0.0, 0.9),
+                                                      (0.6 + (index * 0.05))
+                                                          .clamp(0.1, 1.0),
+                                                      curve: Curves.elasticOut,
+                                                    ).transform(
+                                                      _revealController.value,
                                                     ),
-                                                decoration: BoxDecoration(
-                                                  color: Colors.grey.shade100,
-                                                  borderRadius:
-                                                      BorderRadius.circular(50),
-                                                ),
-                                                child: Row(
-                                                  children: [
-                                                    // Icon in circle
-                                                    Container(
-                                                      width: 36,
-                                                      height: 36,
-                                                      decoration: BoxDecoration(
-                                                        color: const Color(
-                                                          0xFFFFE0E0,
-                                                        ),
-                                                        shape: BoxShape.circle,
+                                                child: Container(
+                                                  margin: EdgeInsets.only(
+                                                    bottom:
+                                                        index <
+                                                            widget
+                                                                    .imposterNames
+                                                                    .length -
+                                                                1
+                                                        ? 8
+                                                        : 0,
+                                                  ),
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 12,
+                                                        vertical: 10,
                                                       ),
-                                                      child: Icon(
-                                                        Icons.theater_comedy,
-                                                        color: const Color(
-                                                          0xFFE53935,
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.grey.shade100,
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          50,
                                                         ),
-                                                        size: 18,
-                                                      ),
-                                                    ),
-                                                    const SizedBox(width: 10),
-                                                    // Name only
-                                                    Expanded(
-                                                      child: Text(
-                                                        name,
-                                                        style: textTheme
-                                                            .titleSmall
-                                                            ?.copyWith(
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .bold,
-                                                              color: colorScheme
-                                                                  .onSurface,
+                                                  ),
+                                                  child: Row(
+                                                    children: [
+                                                      // Icon in circle
+                                                      Container(
+                                                        width: 36,
+                                                        height: 36,
+                                                        decoration:
+                                                            BoxDecoration(
+                                                              color:
+                                                                  const Color(
+                                                                    0xFFFFE0E0,
+                                                                  ),
+                                                              shape: BoxShape
+                                                                  .circle,
                                                             ),
+                                                        child: Icon(
+                                                          Icons.theater_comedy,
+                                                          color: const Color(
+                                                            0xFFE53935,
+                                                          ),
+                                                          size: 18,
+                                                        ),
                                                       ),
-                                                    ),
-                                                  ],
+                                                      const SizedBox(width: 10),
+                                                      // Name only
+                                                      Expanded(
+                                                        child: Text(
+                                                          name,
+                                                          style: textTheme
+                                                              .titleSmall
+                                                              ?.copyWith(
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .bold,
+                                                                color: colorScheme
+                                                                    .onSurface,
+                                                              ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
                                                 ),
                                               ),
+                                            );
+                                          }),
+
+                                          const SizedBox(height: 24),
+
+                                          // Divider
+                                          Opacity(
+                                            opacity:
+                                                Interval(
+                                                  0.5,
+                                                  0.9,
+                                                  curve: Curves.easeOut,
+                                                ).transform(
+                                                  _revealController.value,
+                                                ),
+                                            child: Divider(
+                                              color: Colors.grey.shade200,
+                                              thickness: 1,
                                             ),
-                                          );
-                                        }),
-
-                                        const SizedBox(height: 24),
-
-                                        // Divider
-                                        Opacity(
-                                          opacity: Interval(
-                                            0.5,
-                                            0.9,
-                                            curve: Curves.easeOut,
-                                          ).transform(_revealController.value),
-                                          child: Divider(
-                                            color: Colors.grey.shade200,
-                                            thickness: 1,
                                           ),
-                                        ),
 
-                                        const SizedBox(height: 16),
+                                          const SizedBox(height: 16),
 
-                                        // Secret word and category
-                                        Opacity(
-                                          opacity: Interval(
-                                            0.5,
-                                            0.9,
-                                            curve: Curves.easeOut,
-                                          ).transform(_revealController.value),
-                                          child: Column(
-                                            children: [
-                                              // Secret Word row
-                                              Row(
-                                                children: [
-                                                  Text(
-                                                    'SECRET WORD',
-                                                    style: textTheme.labelSmall
-                                                        ?.copyWith(
-                                                          color: Colors
-                                                              .grey
-                                                              .shade500,
-                                                          letterSpacing: 1,
-                                                          fontWeight:
-                                                              FontWeight.w600,
-                                                        ),
-                                                  ),
-                                                  const Spacer(),
-                                                  Text(
-                                                    widget.secretWord,
-                                                    style: textTheme.titleMedium
-                                                        ?.copyWith(
-                                                          fontWeight:
-                                                              FontWeight.bold,
-                                                          color: colorScheme
-                                                              .onSurface,
-                                                        ),
-                                                  ),
-                                                ],
-                                              ),
-                                              if (widget.category != null) ...[
-                                                const SizedBox(height: 12),
-                                                // Category row
+                                          // Secret word and category
+                                          Opacity(
+                                            opacity:
+                                                Interval(
+                                                  0.5,
+                                                  0.9,
+                                                  curve: Curves.easeOut,
+                                                ).transform(
+                                                  _revealController.value,
+                                                ),
+                                            child: Column(
+                                              children: [
+                                                // Secret Word row
                                                 Row(
                                                   children: [
                                                     Text(
-                                                      'CATEGORY',
+                                                      'SECRET WORD',
                                                       style: textTheme
                                                           .labelSmall
                                                           ?.copyWith(
@@ -1239,39 +1225,74 @@ class _DiscussionViewState extends State<_DiscussionView>
                                                           ),
                                                     ),
                                                     const Spacer(),
-                                                    Row(
-                                                      children: [
-                                                        Icon(
-                                                          Icons
-                                                              .bookmark_outline,
-                                                          size: 18,
-                                                          color: colorScheme
-                                                              .onSurface,
-                                                        ),
-                                                        const SizedBox(
-                                                          width: 4,
-                                                        ),
-                                                        Text(
-                                                          widget.category!,
-                                                          style: textTheme
-                                                              .titleMedium
-                                                              ?.copyWith(
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .bold,
-                                                                color: colorScheme
-                                                                    .onSurface,
-                                                              ),
-                                                        ),
-                                                      ],
+                                                    Text(
+                                                      widget.secretWord,
+                                                      style: textTheme
+                                                          .titleMedium
+                                                          ?.copyWith(
+                                                            fontWeight:
+                                                                FontWeight.bold,
+                                                            color: colorScheme
+                                                                .onSurface,
+                                                          ),
                                                     ),
                                                   ],
                                                 ),
+                                                if (widget.category !=
+                                                    null) ...[
+                                                  const SizedBox(height: 12),
+                                                  // Category row
+                                                  Row(
+                                                    children: [
+                                                      Text(
+                                                        'CATEGORY',
+                                                        style: textTheme
+                                                            .labelSmall
+                                                            ?.copyWith(
+                                                              color: Colors
+                                                                  .grey
+                                                                  .shade500,
+                                                              letterSpacing: 1,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w600,
+                                                            ),
+                                                      ),
+                                                      const Spacer(),
+                                                      Row(
+                                                        children: [
+                                                          Icon(
+                                                            Icons
+                                                                .bookmark_outline,
+                                                            size: 18,
+                                                            color: colorScheme
+                                                                .onSurface,
+                                                          ),
+                                                          const SizedBox(
+                                                            width: 4,
+                                                          ),
+                                                          Text(
+                                                            widget.category!,
+                                                            style: textTheme
+                                                                .titleMedium
+                                                                ?.copyWith(
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .bold,
+                                                                  color: colorScheme
+                                                                      .onSurface,
+                                                                ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ],
                                               ],
-                                            ],
+                                            ),
                                           ),
-                                        ),
-                                      ],
+                                        ],
+                                      ),
                                     ),
                                   ),
                                 );

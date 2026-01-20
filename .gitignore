@@ -37,7 +37,7 @@ www/
 .env.*.local
 
 # Agent/AI assistant files
-.agent/
+#.agent/
 
 # Flutter
 **/build/

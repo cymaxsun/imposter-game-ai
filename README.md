@@ -1,103 +1,79 @@
-# 🎭 Imposter Game AI
+# 🎭 Imposter Finder
 
-An AI-powered party game where players try to find the imposter! Built with **Ionic/Angular** for mobile and **Vercel Serverless Functions** for the backend.
+An AI-powered party game where players try to find the **Odd One Out**! Feature a premium "Stitch"-inspired UI, secure word generation, and seamless cross-platform play.
 
-## Features
+**Built with Flutter & AWS Serverless.**
 
-- 🤖 **AI-Generated Word Lists** - Uses Google Gemini to create themed word lists
-- 📱 **Mobile-First Design** - Built with Ionic for iOS and Android
-- ⚡ **Serverless Backend** - Vercel functions with automatic model fallback
-- 🔄 **Smart Fallback** - Automatically switches between Gemini models if quota is exceeded
+---
 
-## Project Structure
+## ✨ Features
 
-```
-├── api/                    # Vercel Serverless Functions
-│   └── generate-words.js   # AI word generation endpoint
-├── mobile/                 # Ionic/Angular Mobile App
-│   └── src/
-└── vercel.json            # Vercel deployment config
-```
+- **📱 Beautiful Flutter UI**: A polished, "Stitch"-themed interface with smooth animations and haptic feedback.
+- **🔒 Secure Generation**: Uses **Apple App Attest** and **JWT Session Binding** to prevent API abuse.
+- **🤖 AI-Powered**: Uses **Google Gemini** to generate infinite, contextual word lists.
+- **🔄 Intelligent Caching**: Optimizes API costs with smart caching and auto-renewing sessions.
+- **⚡ Serverless Backend**: Powered by **AWS Lambda** and **API Gateway** for zero-maintenance scaling.
 
-## Getting Started
+## 📂 Project Structure
+
+- **`imposter_finder/`**: The Flutter mobile application (iOS/Android).
+- **`api/`**: The AWS SAM (Serverless Application Model) backend.
+
+## 🚀 Getting Started
 
 ### Prerequisites
-- Node.js 18+
-- Vercel CLI (`npm install -g vercel`)
-- Gemini API Key from [Google AI Studio](https://aistudio.google.com/)
 
-### Setup
+- **Flutter SDK** (3.x+)
+- **AWS SAM CLI**
+- **Node.js 18+** (for backend)
+- **Gemini API Key**
 
-1. **Clone the repo**
-   ```bash
-   git clone https://github.com/cymaxsun/imposter-game-ai.git
-   cd imposter-game-ai
-   ```
+### 1. Mobile App (Flutter)
 
-2. **Install API dependencies**
-   ```bash
-   npm install
-   ```
-
-3. **Set up environment variables**
-   ```bash
-   echo "GEMINI_API_KEY=your_key_here" > .env
-   ```
-
-4. **Run the API locally**
-   ```bash
-   vercel dev --listen 3002
-   ```
-
-5. **Run the mobile app** (in a new terminal)
-   ```bash
-   cd mobile
-   npm install
-   npm run start
-   ```
-
-## Deployment
-
-### Deploy API to Vercel
 ```bash
-vercel --prod
+cd imposter_finder
+flutter pub get
+flutter run
 ```
 
-Then add `GEMINI_API_KEY` in **Vercel Dashboard → Settings → Environment Variables**.
+### 2. Backend (AWS SAM)
 
-### Build Mobile App
-```bash
-cd mobile
-ionic build
-npx cap sync
-```
+1.  Navigate to the API folder:
+    ```bash
+    cd api
+    ```
+2.  Create a `.env` file with your Gemini API key:
+    ```bash
+    echo "GEMINI_API_KEY=your_key_here" > .env
+    ```
+3.  Build and Deploy:
+    ```bash
+    sam build
+    sam deploy --guided
+    ```
 
-## API Endpoints
+## 🛠️ Tech Stack
 
-### POST `/api/generate-words`
+### Mobile (Client)
+- **Framework**: Flutter (Dart)
+- **State Management**: standard `setState` + `Services` pattern
+- **Security**: `app_device_integrity` (Attestation), `flutter_secure_storage`
 
-Generates a list of themed words using AI.
+### Backend (Server)
+- **Runtime**: Node.js 20.x
+- **Infrastructure**: AWS Lambda, API Gateway
+- **AI**: `@google/genai` SDK
+- **Security**: Apple App Attest verification, JWT (JsonWebToken)
 
-**Request:**
-```json
-{
-  "topic": "Marvel Superheroes"
-}
-```
+## 🔐 Security Architecture
 
-**Response:**
-```json
-{
-  "words": ["Iron Man", "Thor", "Spider-Man", ...]
-}
-```
+This app implements a high-security "Handshake" protocol:
+1.  **Challenge**: App requests a cryptographic nonce from the server.
+2.  **Attestation**: App signs the nonce using the device's Secure Enclave (Apple App Attest).
+3.  **Verification**: Server validates the signature with Apple.
+4.  **Session**: If valid, server issues a short-lived **Session JWT**.
+5.  **Access**: App uses the JWT for subsequent API calls (Word Generation).
 
-## Tech Stack
-
-- **Frontend:** Ionic, Angular, Tailwind CSS
-- **Backend:** Vercel Serverless Functions
-- **AI:** Google Gemini API (`gemini-2.5-flash-lite` with fallback to `gemini-2.5-flash`)
-
-## License
+## 📄 License
 
 MIT
