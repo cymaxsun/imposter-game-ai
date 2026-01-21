@@ -146,23 +146,45 @@ class _ManageCategoriesScreenState extends State<ManageCategoriesScreen> {
           } else {
             _addCategory(newName, newWords);
           }
-          Navigator.pop(context);
+          // Navigator.pop(context); // Already popping in modal
         },
-        onDelete: isEditing
-            ? () {
-                _deleteCategory(initialName);
-                Navigator.pop(context);
-              }
-            : null,
       ),
     );
+  }
+
+  Future<void> _confirmDelete(String categoryName) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Category?'),
+        content: Text('Are you sure you want to delete "$categoryName"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      _deleteCategory(categoryName);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Category "$categoryName" deleted')),
+        );
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final screenWidth = MediaQuery.of(context).size.width;
-    final scaleFactor = (screenWidth / 375.0).clamp(0.8, 1.2);
 
     return PopScope(
       canPop: false,
@@ -171,67 +193,77 @@ class _ManageCategoriesScreenState extends State<ManageCategoriesScreen> {
         Navigator.of(context).pop(_categories);
       },
       child: Scaffold(
-        backgroundColor: const Color(0xFFF8FAFC), // Same as setup screen
         appBar: AppBar(
           backgroundColor: const Color(0xFFF8FAFC),
           elevation: 0,
           scrolledUnderElevation: 0,
-          leading: IconButton(
-            icon: Icon(
-              Icons.arrow_back_ios,
-              color: colorScheme.primary,
-              size: 20 * scaleFactor,
+          leadingWidth: 100,
+          leading: GestureDetector(
+            onTap: () => Navigator.of(context).pop(_categories),
+            behavior: HitTestBehavior.opaque,
+            child: Row(
+              children: [
+                const SizedBox(width: 16),
+                Icon(
+                  Icons.arrow_back_ios,
+                  color: colorScheme.primary,
+                  size: 20,
+                ),
+                Text(
+                  'Back',
+                  style: TextStyle(
+                    color: colorScheme.primary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
             ),
-            onPressed: () => Navigator.of(context).pop(_categories),
           ),
-          title: Text(
-            'AI Category Studio',
-            style: TextStyle(
-              color: const Color(0xFF6B5CE7),
-              fontWeight: FontWeight.w600,
-              fontSize: 18 * scaleFactor,
-            ),
-          ),
-          centerTitle: true,
         ),
         body: SafeArea(
           child: SingleChildScrollView(
-            padding: EdgeInsets.symmetric(horizontal: 20 * scaleFactor),
+            padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SizedBox(height: 16 * scaleFactor),
+                const SizedBox(height: 16),
 
-                // Header Section
-                Text(
-                  'Describe your theme',
-                  style: TextStyle(
-                    fontSize: 24 * scaleFactor,
-                    fontWeight: FontWeight.bold,
-                    color: const Color(0xFF2D3748),
-                  ),
+                // Animated Hero Header
+
+                // Simple Hero Header
+                const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'AI Studio',
+                      style: TextStyle(
+                        fontSize: 34,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF2D3748),
+                        letterSpacing: -1.0,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Describe a topic or theme to create a category.',
+                      style: TextStyle(fontSize: 14, color: Color(0xFF718096)),
+                    ),
+                  ],
                 ),
-                SizedBox(height: 4 * scaleFactor),
-                Text(
-                  'What should players identify in "Imposter Finder"?',
-                  style: TextStyle(
-                    fontSize: 14 * scaleFactor,
-                    color: Colors.grey[600],
-                  ),
-                ),
-                SizedBox(height: 16 * scaleFactor),
+                const SizedBox(height: 24),
 
                 // Input Card
                 Container(
-                  padding: EdgeInsets.all(16 * scaleFactor),
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(16 * scaleFactor),
+                    borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withValues(alpha: 0.05),
-                        blurRadius: 10 * scaleFactor,
-                        offset: Offset(0, 4 * scaleFactor),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
                       ),
                     ],
                   ),
@@ -241,35 +273,35 @@ class _ManageCategoriesScreenState extends State<ManageCategoriesScreen> {
                       TextField(
                         controller: _topicController,
                         maxLines: 3,
-                        style: TextStyle(
-                          fontSize: 16 * scaleFactor,
-                          color: const Color(0xFF2D3748),
+                        style: const TextStyle(
+                          fontSize: 16,
+                          color: Color(0xFF2D3748),
                         ),
                         decoration: InputDecoration(
                           hintText:
                               'e.g., Things found in a bakery, items in a wizard\'s pocket, or 90\'s cartoons...',
                           hintStyle: TextStyle(
                             color: Colors.grey[400],
-                            fontSize: 15 * scaleFactor,
+                            fontSize: 15,
                           ),
                           border: InputBorder.none,
                           contentPadding: EdgeInsets.zero,
                         ),
                       ),
-                      SizedBox(height: 8 * scaleFactor),
+                      const SizedBox(height: 8),
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
                             Icons.auto_awesome,
-                            size: 14 * scaleFactor,
+                            size: 14,
                             color: Colors.grey[400],
                           ),
-                          SizedBox(width: 4 * scaleFactor),
+                          const SizedBox(width: 4),
                           Text(
                             'AI POWERED',
                             style: TextStyle(
-                              fontSize: 11 * scaleFactor,
+                              fontSize: 11,
                               color: Colors.grey[400],
                               fontWeight: FontWeight.w500,
                               letterSpacing: 0.5,
@@ -282,17 +314,14 @@ class _ManageCategoriesScreenState extends State<ManageCategoriesScreen> {
                 ),
 
                 if (_errorMessage.isNotEmpty) ...[
-                  SizedBox(height: 8 * scaleFactor),
+                  const SizedBox(height: 8),
                   Text(
                     _errorMessage,
-                    style: TextStyle(
-                      color: Colors.red,
-                      fontSize: 13 * scaleFactor,
-                    ),
+                    style: const TextStyle(color: Colors.red, fontSize: 13),
                   ),
                 ],
 
-                SizedBox(height: 16 * scaleFactor),
+                const SizedBox(height: 16),
 
                 // Generate Button
                 SizedBox(
@@ -304,12 +333,12 @@ class _ManageCategoriesScreenState extends State<ManageCategoriesScreen> {
                         begin: Alignment.centerLeft,
                         end: Alignment.centerRight,
                       ),
-                      borderRadius: BorderRadius.circular(28 * scaleFactor),
+                      borderRadius: BorderRadius.circular(28),
                       boxShadow: [
                         BoxShadow(
                           color: const Color(0xFF6B5CE7).withValues(alpha: 0.3),
-                          blurRadius: 12 * scaleFactor,
-                          offset: Offset(0, 4 * scaleFactor),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
                         ),
                       ],
                     ),
@@ -318,37 +347,31 @@ class _ManageCategoriesScreenState extends State<ManageCategoriesScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.transparent,
                         shadowColor: Colors.transparent,
-                        padding: EdgeInsets.symmetric(
-                          vertical: 16 * scaleFactor,
-                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(28 * scaleFactor),
+                          borderRadius: BorderRadius.circular(28),
                         ),
                       ),
                       child: _isLoading
-                          ? SizedBox(
-                              height: 20 * scaleFactor,
-                              width: 20 * scaleFactor,
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
                               child: CircularProgressIndicator(
-                                strokeWidth: 2 * scaleFactor,
+                                strokeWidth: 2,
                                 color: Colors.white,
                               ),
                             )
-                          : Row(
+                          : const Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(
-                                  Icons.bolt,
-                                  color: Colors.white,
-                                  size: 20 * scaleFactor,
-                                ),
-                                SizedBox(width: 8 * scaleFactor),
+                                Icon(Icons.bolt, color: Colors.white, size: 20),
+                                SizedBox(width: 8),
                                 Text(
                                   'Generate with AI',
                                   style: TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.w600,
-                                    fontSize: 16 * scaleFactor,
+                                    fontSize: 16,
                                   ),
                                 ),
                               ],
@@ -357,41 +380,28 @@ class _ManageCategoriesScreenState extends State<ManageCategoriesScreen> {
                   ),
                 ),
 
-                SizedBox(height: 28 * scaleFactor),
+                const SizedBox(height: 28),
 
                 // Categories Section Header
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 8 * scaleFactor,
-                          height: 8 * scaleFactor,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF6B5CE7),
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        SizedBox(width: 8 * scaleFactor),
-                        Text(
-                          'Your Categories',
-                          style: TextStyle(
-                            fontSize: 16 * scaleFactor,
-                            fontWeight: FontWeight.w600,
-                            color: const Color(0xFF2D3748),
-                          ),
-                        ),
-                      ],
+                    const Text(
+                      'Your Categories',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF2D3748),
+                      ),
                     ),
                     TextButton(
                       onPressed: () => _showCategoryEditor(),
-                      child: Text(
+                      child: const Text(
                         'ADD NEW',
                         style: TextStyle(
-                          fontSize: 12 * scaleFactor,
+                          fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: Colors.grey[500],
+                          color: Color(0xFFA0AEC0),
                           letterSpacing: 0.5,
                         ),
                       ),
@@ -399,38 +409,38 @@ class _ManageCategoriesScreenState extends State<ManageCategoriesScreen> {
                   ],
                 ),
 
-                SizedBox(height: 12 * scaleFactor),
+                const SizedBox(height: 12),
 
                 // Categories Grid
                 if (_categories.isEmpty)
                   Container(
-                    padding: EdgeInsets.all(32 * scaleFactor),
+                    padding: const EdgeInsets.all(32),
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(16 * scaleFactor),
+                      borderRadius: BorderRadius.circular(16),
                     ),
                     child: Center(
                       child: Column(
                         children: [
                           Icon(
                             Icons.category_outlined,
-                            size: 48 * scaleFactor,
+                            size: 48,
                             color: Colors.grey[300],
                           ),
-                          SizedBox(height: 12 * scaleFactor),
+                          const SizedBox(height: 12),
                           Text(
                             'No categories yet',
                             style: TextStyle(
-                              fontSize: 16 * scaleFactor,
+                              fontSize: 16,
                               color: Colors.grey[500],
                               fontWeight: FontWeight.w500,
                             ),
                           ),
-                          SizedBox(height: 4 * scaleFactor),
+                          const SizedBox(height: 4),
                           Text(
                             'Generate one with AI or add manually!',
                             style: TextStyle(
-                              fontSize: 13 * scaleFactor,
+                              fontSize: 13,
                               color: Colors.grey[400],
                             ),
                           ),
@@ -442,12 +452,13 @@ class _ManageCategoriesScreenState extends State<ManageCategoriesScreen> {
                   GridView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      crossAxisSpacing: 12 * scaleFactor,
-                      mainAxisSpacing: 12 * scaleFactor,
-                      childAspectRatio: 1.1,
-                    ),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          crossAxisSpacing: 12,
+                          mainAxisSpacing: 12,
+                          childAspectRatio: 1.1,
+                        ),
                     itemCount: _categories.length,
                     itemBuilder: (context, index) {
                       final name = _categories.keys.elementAt(index);
@@ -456,23 +467,24 @@ class _ManageCategoriesScreenState extends State<ManageCategoriesScreen> {
                         name: name,
                         wordCount: wordCount,
                         onTap: () => _showCategoryEditor(categoryName: name),
+                        onDelete: () => _confirmDelete(name),
                       );
                     },
                   ),
 
-                SizedBox(height: 24 * scaleFactor),
+                const SizedBox(height: 24),
 
                 // Creator Tip Section
                 Container(
-                  padding: EdgeInsets.all(16 * scaleFactor),
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(16 * scaleFactor),
+                    borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withValues(alpha: 0.03),
-                        blurRadius: 8 * scaleFactor,
-                        offset: Offset(0, 2 * scaleFactor),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
                       ),
                     ],
                   ),
@@ -480,38 +492,67 @@ class _ManageCategoriesScreenState extends State<ManageCategoriesScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Container(
-                        padding: EdgeInsets.all(8 * scaleFactor),
+                        padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
                           color: const Color(0xFFFFF8E1),
-                          borderRadius: BorderRadius.circular(12 * scaleFactor),
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        child: Icon(
+                        child: const Icon(
                           Icons.lightbulb_outline,
-                          color: const Color(0xFFFFB300),
-                          size: 20 * scaleFactor,
+                          color: Color(0xFFFFB300),
+                          size: 20,
                         ),
                       ),
-                      SizedBox(width: 12 * scaleFactor),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              'CREATOR TIP',
-                              style: TextStyle(
-                                fontSize: 11 * scaleFactor,
-                                fontWeight: FontWeight.bold,
-                                color: const Color(0xFF2D3748),
-                                letterSpacing: 0.5,
-                              ),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'CREATOR TIP',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF2D3748),
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                                GestureDetector(
+                                  onTap: _shuffleTip,
+                                  child: Icon(
+                                    Icons.refresh,
+                                    size: 16,
+                                    color: Colors.grey[400],
+                                  ),
+                                ),
+                              ],
                             ),
-                            SizedBox(height: 4 * scaleFactor),
-                            Text(
-                              _currentTip,
-                              style: TextStyle(
-                                fontSize: 13 * scaleFactor,
-                                color: Colors.grey[600],
-                                height: 1.4,
+                            const SizedBox(height: 4),
+                            AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 300),
+                              transitionBuilder: (child, animation) {
+                                return FadeTransition(
+                                  opacity: animation,
+                                  child: SlideTransition(
+                                    position: Tween<Offset>(
+                                      begin: const Offset(0, 0.2),
+                                      end: Offset.zero,
+                                    ).animate(animation),
+                                    child: child,
+                                  ),
+                                );
+                              },
+                              child: Text(
+                                _currentTip,
+                                key: ValueKey<String>(_currentTip),
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: Color(0xFF718096),
+                                  height: 1.4,
+                                ),
                               ),
                             ),
                           ],
@@ -521,7 +562,7 @@ class _ManageCategoriesScreenState extends State<ManageCategoriesScreen> {
                   ),
                 ),
 
-                SizedBox(height: 32 * scaleFactor),
+                const SizedBox(height: 32),
               ],
             ),
           ),
@@ -536,11 +577,13 @@ class _CategoryCard extends StatelessWidget {
   final String name;
   final int wordCount;
   final VoidCallback onTap;
+  final VoidCallback? onDelete;
 
   const _CategoryCard({
     required this.name,
     required this.wordCount,
     required this.onTap,
+    this.onDelete,
   });
 
   // Get an icon and color based on category name
@@ -599,116 +642,140 @@ class _CategoryCard extends StatelessWidget {
     return (Icons.category, const Color(0xFF6B5CE7));
   }
 
-  String _getCategoryLabel(String name) {
-    final lowerName = name.toLowerCase();
-
-    if (lowerName.contains('food') ||
-        lowerName.contains('kitchen') ||
-        lowerName.contains('restaurant') ||
-        lowerName.contains('cook') ||
-        lowerName.contains('sushi') ||
-        lowerName.contains('bakery')) {
-      return 'KITCHEN';
-    }
-    if (lowerName.contains('space') ||
-        lowerName.contains('sci') ||
-        lowerName.contains('robot') ||
-        lowerName.contains('future')) {
-      return 'SCI-FI';
-    }
-    if (lowerName.contains('nature') ||
-        lowerName.contains('jungle') ||
-        lowerName.contains('forest') ||
-        lowerName.contains('animal')) {
-      return 'NATURE';
-    }
-    if (lowerName.contains('castle') ||
-        lowerName.contains('magic') ||
-        lowerName.contains('fantasy') ||
-        lowerName.contains('wizard')) {
-      return 'FANTASY';
-    }
-    if (lowerName.contains('movie') ||
-        lowerName.contains('film') ||
-        lowerName.contains('tv') ||
-        lowerName.contains('cartoon')) {
-      return 'ENTERTAINMENT';
-    }
-    if (lowerName.contains('music') ||
-        lowerName.contains('song') ||
-        lowerName.contains('band')) {
-      return 'MUSIC';
-    }
-    if (lowerName.contains('sport') ||
-        lowerName.contains('game') ||
-        lowerName.contains('play')) {
-      return 'SPORTS';
-    }
-    if (lowerName.contains('travel') ||
-        lowerName.contains('country') ||
-        lowerName.contains('city')) {
-      return 'TRAVEL';
-    }
-
-    return '$wordCount WORDS';
-  }
-
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final scaleFactor = (screenWidth / 375.0).clamp(0.8, 1.2);
     final (icon, color) = _getCategoryStyle(name);
-    final label = _getCategoryLabel(name);
 
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: EdgeInsets.all(16 * scaleFactor),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16 * scaleFactor),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 8 * scaleFactor,
-              offset: Offset(0, 2 * scaleFactor),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        splashColor: color.withValues(alpha: 0.1),
+        highlightColor: color.withValues(alpha: 0.05),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: color.withValues(alpha: 0.15),
+              width: 1.5,
             ),
-          ],
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: EdgeInsets.all(12 * scaleFactor),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12 * scaleFactor),
+            boxShadow: [
+              BoxShadow(
+                color: color.withValues(alpha: 0.08),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
               ),
-              child: Icon(icon, color: color, size: 28 * scaleFactor),
-            ),
-            SizedBox(height: 12 * scaleFactor),
-            Text(
-              name,
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 14 * scaleFactor,
-                fontWeight: FontWeight.w600,
-                color: const Color(0xFF2D3748),
+            ],
+          ),
+          child: Stack(
+            children: [
+              // Delete button in top-right
+              Positioned(
+                top: 0,
+                right: 0,
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: onDelete,
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withValues(alpha: 0.1),
+                        borderRadius: const BorderRadius.only(
+                          topRight: Radius.circular(14),
+                          bottomLeft: Radius.circular(8),
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.delete_outline,
+                        size: 16,
+                        color: Colors.red,
+                      ),
+                    ),
+                  ),
+                ),
               ),
-            ),
-            SizedBox(height: 4 * scaleFactor),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 10 * scaleFactor,
-                color: color,
-                fontWeight: FontWeight.w500,
-                letterSpacing: 0.5,
+
+              Center(
+                child: FractionallySizedBox(
+                  widthFactor: 0.8,
+                  heightFactor: 0.7,
+                  child: FittedBox(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                color.withValues(alpha: 0.15),
+                                color.withValues(alpha: 0.05),
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(icon, color: color, size: 28),
+                        ),
+                        const SizedBox(height: 8),
+                        FittedBox(
+                          child: Text(
+                            name,
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF2D3748),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        // Word count badge in subtitle position
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: color.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: FittedBox(
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.format_list_bulleted_rounded,
+                                  size: 10,
+                                  color: color,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '$wordCount',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: color,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -733,81 +800,80 @@ class _GeneratedWordsSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final scaleFactor = (screenWidth / 375.0).clamp(0.8, 1.2);
-
     return Container(
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(24 * scaleFactor),
-        ),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      padding: EdgeInsets.all(24 * scaleFactor),
+      padding: const EdgeInsets.all(24),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
-              Icon(
+              const Icon(
                 Icons.check_circle,
-                color: const Color(0xFF4CAF50),
-                size: 24 * scaleFactor,
+                color: Color(0xFF4CAF50),
+                size: 24,
               ),
-              SizedBox(width: 8 * scaleFactor),
+              const SizedBox(width: 8),
               Expanded(
-                child: Text(
-                  'Generated: $topic',
-                  style: TextStyle(
-                    color: const Color(0xFF6B5CE7),
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18 * scaleFactor,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Generated: $topic',
+                    style: const TextStyle(
+                      color: Color(0xFF6B5CE7),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
                   ),
                 ),
               ),
               IconButton(
                 onPressed: onDiscard,
-                icon: Icon(Icons.close, size: 24 * scaleFactor),
+                icon: const Icon(Icons.close, size: 24),
               ),
             ],
           ),
-          SizedBox(height: 16 * scaleFactor),
+          const SizedBox(height: 16),
           Wrap(
-            spacing: 8 * scaleFactor,
-            runSpacing: 8 * scaleFactor,
+            spacing: 8,
+            runSpacing: 8,
             children: words.map((word) {
               return Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: 12 * scaleFactor,
-                  vertical: 8 * scaleFactor,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
                 ),
                 decoration: BoxDecoration(
                   color: const Color(0xFFF5F5F5),
-                  borderRadius: BorderRadius.circular(12 * scaleFactor),
+                  borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
                 ),
                 child: Text(
                   word,
-                  style: TextStyle(
-                    color: const Color(0xFF2D3748),
-                    fontSize: 14 * scaleFactor,
+                  style: const TextStyle(
+                    color: Color(0xFF2D3748),
+                    fontSize: 14,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
               );
             }).toList(),
           ),
-          SizedBox(height: 24 * scaleFactor),
+          const SizedBox(height: 24),
           Row(
             children: [
               Expanded(
                 child: OutlinedButton(
                   onPressed: onDiscard,
                   style: OutlinedButton.styleFrom(
-                    padding: EdgeInsets.symmetric(vertical: 16 * scaleFactor),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16 * scaleFactor),
+                      borderRadius: BorderRadius.circular(16),
                     ),
                     side: BorderSide(color: Colors.grey[300]!),
                     foregroundColor: Colors.grey[700],
@@ -815,16 +881,16 @@ class _GeneratedWordsSheet extends StatelessWidget {
                   child: const Text('Discard'),
                 ),
               ),
-              SizedBox(width: 12 * scaleFactor),
+              const SizedBox(width: 12),
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: onRetry,
-                  icon: Icon(Icons.refresh, size: 18 * scaleFactor),
+                  icon: const Icon(Icons.refresh, size: 18),
                   label: const Text('Retry'),
                   style: OutlinedButton.styleFrom(
-                    padding: EdgeInsets.symmetric(vertical: 16 * scaleFactor),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16 * scaleFactor),
+                      borderRadius: BorderRadius.circular(16),
                     ),
                     side: const BorderSide(color: Color(0xFF6B5CE7)),
                     foregroundColor: const Color(0xFF6B5CE7),
@@ -833,30 +899,30 @@ class _GeneratedWordsSheet extends StatelessWidget {
               ),
             ],
           ),
-          SizedBox(height: 12 * scaleFactor),
+          const SizedBox(height: 12),
           Container(
             decoration: BoxDecoration(
               gradient: const LinearGradient(
                 colors: [Color(0xFF8B7CF6), Color(0xFF6B5CE7)],
               ),
-              borderRadius: BorderRadius.circular(16 * scaleFactor),
+              borderRadius: BorderRadius.circular(16),
             ),
             child: ElevatedButton(
               onPressed: onSave,
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.transparent,
                 shadowColor: Colors.transparent,
-                padding: EdgeInsets.symmetric(vertical: 16 * scaleFactor),
+                padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16 * scaleFactor),
+                  borderRadius: BorderRadius.circular(16),
                 ),
               ),
-              child: Text(
+              child: const Text(
                 'Save to Library',
                 style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
-                  fontSize: 16 * scaleFactor,
+                  fontSize: 16,
                 ),
               ),
             ),
@@ -869,17 +935,16 @@ class _GeneratedWordsSheet extends StatelessWidget {
 }
 
 /// Modal for creating/editing a category.
+/// Modal for creating/editing a category.
 class _CategoryEditorModal extends StatefulWidget {
   final String initialName;
   final List<String> initialWords;
   final Function(String, List<String>) onSave;
-  final VoidCallback? onDelete;
 
   const _CategoryEditorModal({
     required this.initialName,
     required this.initialWords,
     required this.onSave,
-    this.onDelete,
   });
 
   @override
@@ -888,34 +953,43 @@ class _CategoryEditorModal extends StatefulWidget {
 
 class _CategoryEditorModalState extends State<_CategoryEditorModal> {
   late TextEditingController _nameController;
-  late List<TextEditingController> _wordControllers;
+  late TextEditingController _wordInputController;
+  late List<String> _words;
 
   @override
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.initialName);
-    _wordControllers = widget.initialWords
-        .map((w) => TextEditingController(text: w))
-        .toList();
+    _wordInputController = TextEditingController();
+    _words = List.from(widget.initialWords);
   }
 
   @override
   void dispose() {
     _nameController.dispose();
-    for (var c in _wordControllers) {
-      c.dispose();
-    }
+    _wordInputController.dispose();
     super.dispose();
   }
 
-  void _addWordField() {
-    setState(() => _wordControllers.add(TextEditingController()));
+  void _addWords(String text) {
+    final newWords = text
+        .split(RegExp(r'[,\n]')) // Split by comma or newline
+        .map((w) => w.trim())
+        .where((w) => w.isNotEmpty)
+        .toList();
+
+    if (newWords.isNotEmpty) {
+      _words.addAll(newWords);
+      _wordInputController.clear();
+      if (mounted) {
+        setState(() {});
+      }
+    }
   }
 
-  void _removeWordField(int index) {
+  void _removeWord(int index) {
     setState(() {
-      _wordControllers[index].dispose();
-      _wordControllers.removeAt(index);
+      _words.removeAt(index);
     });
   }
 
@@ -923,202 +997,224 @@ class _CategoryEditorModalState extends State<_CategoryEditorModal> {
     final name = _nameController.text.trim();
     if (name.isEmpty) return;
 
-    final words = _wordControllers
-        .map((c) => c.text.trim())
-        .where((w) => w.isNotEmpty)
-        .toList();
+    // Add any pending text in the input field as a word
+    if (_wordInputController.text.isNotEmpty) {
+      _addWords(_wordInputController.text);
+    }
 
-    widget.onSave(name, words);
+    if (_words.isEmpty) return; // Optional: Require at least one word?
+
+    widget.onSave(name, _words);
   }
 
   @override
   Widget build(BuildContext context) {
     final isNew = widget.initialName.isEmpty;
-    final screenWidth = MediaQuery.of(context).size.width;
-    final scaleFactor = (screenWidth / 375.0).clamp(0.8, 1.2);
+    final viewInsets = MediaQuery.of(context).viewInsets;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(24 * scaleFactor),
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (didPop, result) {
+        // Save automatically when closing (via back button, swipe, or close icon)
+        _save();
+      },
+      child: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
-      ),
-      padding: EdgeInsets.only(
-        top: 24 * scaleFactor,
-        left: 24 * scaleFactor,
-        right: 24 * scaleFactor,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 24 * scaleFactor,
-      ),
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.9,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                isNew ? 'New Category' : 'Edit Category',
-                style: TextStyle(
-                  fontSize: 20 * scaleFactor,
-                  fontWeight: FontWeight.bold,
-                  color: const Color(0xFF6B5CE7),
+        padding: EdgeInsets.only(
+          top: 24,
+          left: 24,
+          right: 24,
+          bottom: viewInsets.bottom + 24,
+        ),
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.9,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      isNew ? 'New Category' : 'Edit Category',
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w600, // Bolder
+                        color: Color(0xFF2D3748), // Darker text
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-              IconButton(
-                onPressed: () => Navigator.pop(context),
-                icon: Icon(Icons.close, size: 24 * scaleFactor),
-              ),
-            ],
-          ),
-          SizedBox(height: 24 * scaleFactor),
-          Flexible(
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  TextField(
-                    controller: _nameController,
-                    decoration: InputDecoration(
-                      labelText: 'Category Name',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12 * scaleFactor),
-                      ),
-                      filled: true,
-                      fillColor: const Color(0xFFF5F5F5),
-                      contentPadding: EdgeInsets.symmetric(
-                        horizontal: 12 * scaleFactor,
-                        vertical: 16 * scaleFactor,
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: 16 * scaleFactor),
-                  Text(
-                    "Words",
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey,
-                      fontSize: 14 * scaleFactor,
-                    ),
-                  ),
-                  SizedBox(height: 8 * scaleFactor),
-                  ...List.generate(_wordControllers.length, (index) {
-                    return Padding(
-                      padding: EdgeInsets.only(
-                        bottom: index == _wordControllers.length - 1
-                            ? 0
-                            : 8 * scaleFactor,
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _wordControllers[index],
-                              decoration: InputDecoration(
-                                hintText: 'Word ${index + 1}',
-                                isDense: true,
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(
-                                    8 * scaleFactor,
-                                  ),
-                                ),
-                                contentPadding: EdgeInsets.symmetric(
-                                  horizontal: 12 * scaleFactor,
-                                  vertical: 12 * scaleFactor,
-                                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close, size: 24),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            Flexible(
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'CATEGORY NAME',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(
+                              0xFF2D3748,
+                            ).withValues(alpha: 0.7),
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: Colors.grey.withValues(alpha: 0.2),
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.03),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: TextField(
+                            controller: _nameController,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF2D3748),
+                            ),
+                            decoration: InputDecoration(
+                              hintText: 'e.g., Space Stuff',
+                              hintStyle: TextStyle(
+                                color: Colors.grey.withValues(alpha: 0.5),
+                              ),
+                              border: InputBorder.none,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 14,
                               ),
                             ),
                           ),
-                          if (_wordControllers.length > 1)
-                            IconButton(
-                              icon: Icon(
-                                Icons.remove_circle_outline,
-                                color: Colors.red,
-                                size: 24 * scaleFactor,
-                              ),
-                              onPressed: () => _removeWordField(index),
-                            ),
-                        ],
-                      ),
-                    );
-                  }),
-                  SizedBox(height: 8 * scaleFactor),
-                  TextButton.icon(
-                    onPressed: _addWordField,
-                    icon: Icon(Icons.add, size: 24 * scaleFactor),
-                    label: Text(
-                      "Add Another Word",
-                      style: TextStyle(fontSize: 14 * scaleFactor),
+                        ),
+                      ],
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 16),
+                    const Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          "Words",
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey,
+                            fontSize: 14,
+                          ),
+                        ),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerRight,
+                            child: Text(
+                              'Tip: Use comma/enter to add quickly',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFFA0AEC0),
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        ..._words.asMap().entries.map((entry) {
+                          return InputChip(
+                            label: Text(entry.value),
+                            backgroundColor: const Color(0xFFF0F0FF),
+                            labelStyle: const TextStyle(
+                              color: Color(0xFF6B5CE7),
+                              fontSize: 14,
+                            ),
+                            onDeleted: () => _removeWord(entry.key),
+                            deleteIcon: const Icon(
+                              Icons.close,
+                              size: 16,
+                              color: Color(0xFF6B5CE7),
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                              side: BorderSide(
+                                color: const Color(
+                                  0xFF6B5CE7,
+                                ).withValues(alpha: 0.2),
+                              ),
+                            ),
+                          );
+                        }),
+                        Container(
+                          width: 150,
+                          constraints: const BoxConstraints(minWidth: 100),
+                          child: TextField(
+                            controller: _wordInputController,
+                            onSubmitted: _addWords,
+                            onChanged: (value) {
+                              if (value.contains(',') || value.contains('\n')) {
+                                _addWords(value);
+                              }
+                            },
+                            decoration: InputDecoration(
+                              hintText: 'Add words...',
+                              isDense: true,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(20),
+                                borderSide: BorderSide(
+                                  color: Colors.grey.withValues(alpha: 0.3),
+                                ),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                              filled: true,
+                              fillColor: Colors.white,
+                            ),
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-          SizedBox(height: 16 * scaleFactor),
-          Row(
-            children: [
-              if (!isNew && widget.onDelete != null)
-                Expanded(
-                  child: Padding(
-                    padding: EdgeInsets.only(right: 16 * scaleFactor),
-                    child: OutlinedButton(
-                      onPressed: widget.onDelete,
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.red,
-                        side: BorderSide(
-                          color: Colors.red.withValues(alpha: 0.5),
-                        ),
-                        padding: EdgeInsets.symmetric(
-                          vertical: 16 * scaleFactor,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16 * scaleFactor),
-                        ),
-                      ),
-                      child: Text(
-                        "Delete",
-                        style: TextStyle(fontSize: 14 * scaleFactor),
-                      ),
-                    ),
-                  ),
-                ),
-              Expanded(
-                flex: 2,
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF8B7CF6), Color(0xFF6B5CE7)],
-                    ),
-                    borderRadius: BorderRadius.circular(16 * scaleFactor),
-                  ),
-                  child: ElevatedButton(
-                    onPressed: _save,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.transparent,
-                      shadowColor: Colors.transparent,
-                      padding: EdgeInsets.symmetric(vertical: 16 * scaleFactor),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16 * scaleFactor),
-                      ),
-                    ),
-                    child: Text(
-                      "Save Changes",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 14 * scaleFactor,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

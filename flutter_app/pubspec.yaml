@@ -38,6 +38,7 @@ dependencies:
   shared_preferences: ^2.2.2
   app_device_integrity: ^1.1.0
   flutter_secure_storage: ^10.0.0
+  auto_size_text: ^3.0.0
 
 
 dev_dependencies:
@@ -53,6 +54,7 @@ dev_dependencies:
   checks: ^0.3.1
   integration_test:
     sdk: flutter
+  mocktail: ^1.0.4
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

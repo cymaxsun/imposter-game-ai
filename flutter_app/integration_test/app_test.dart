@@ -18,7 +18,7 @@ void main() {
       expect(find.text('START GAME'), findsOneWidget);
 
       // Act - Increase player count
-      final addButton = find.byIcon(Icons.add);
+      final addButton = find.byIcon(Icons.add_circle);
       await tester.tap(addButton);
       await tester.pumpAndSettle();
 
@@ -32,7 +32,25 @@ void main() {
 
       // Assert - Game screen is displayed
       expect(find.text('PLAYER 1/5'), findsOneWidget);
-      expect(find.text('TAP TO\nREVEAL'), findsOneWidget);
+      expect(find.text('TAP TO REVEAL'), findsOneWidget);
+
+      // Act - Tap Card to Reveal
+      await tester.tap(find.text('TAP TO REVEAL'));
+      await tester.pumpAndSettle(); // Wait for flip animation
+
+      // Assert - Card is revealed (Innocent or Imposter)
+      if (find.text('INNOCENT').evaluate().isNotEmpty) {
+        expect(find.text('INNOCENT'), findsOneWidget);
+      } else {
+        expect(find.text('IMPOSTER'), findsOneWidget);
+      }
+      // Act - Tap Next Player
+      final nextButton = find.text('NEXT PLAYER');
+      await tester.tap(nextButton);
+      await tester.pumpAndSettle(); // Wait for flip back animation
+
+      // Assert - Advance to Player 2
+      expect(find.text('PLAYER 2/5'), findsOneWidget);
     });
 
     testWidgets('manage categories navigation', (tester) async {
@@ -41,14 +59,13 @@ void main() {
       await tester.pumpAndSettle();
 
       // Act - Navigate to manage categories
-      final manageButton = find.text('Manage Categories / AI');
+      final manageButton = find.text('AI Studio');
       await tester.tap(manageButton);
       await tester.pumpAndSettle();
 
       // Assert - Manage categories screen is displayed
-      expect(find.text('Library'), findsOneWidget);
-      expect(find.text('AI Studio'), findsOneWidget);
-      expect(find.text('Animals'), findsOneWidget);
+      expect(find.text('AI Category Studio'), findsOneWidget);
+      expect(find.text('Forge Your Words'), findsOneWidget);
     });
   });
 }

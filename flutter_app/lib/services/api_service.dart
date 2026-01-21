@@ -3,6 +3,7 @@ import 'dart:developer' as developer;
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
+import 'package:meta/meta.dart';
 
 import 'attest_service.dart';
 
@@ -20,11 +21,22 @@ class ApiService {
   static const String _challengeEndpoint = '$_baseUrl/challenge';
   static const String _verifyDeviceEndpoint = '$_baseUrl/auth/verify-device';
 
-  static const _storage = FlutterSecureStorage();
+  static http.Client _client = http.Client();
+  static FlutterSecureStorage _storage = const FlutterSecureStorage();
+
+  @visibleForTesting
+  static set client(http.Client client) => _client = client;
+
+  @visibleForTesting
+  static set storage(FlutterSecureStorage storage) => _storage = storage;
+
   static const _sessionTokenKey = 'session_token';
 
   /// In-memory cache for the session token to reduce storage reads.
   static String? _currentSessionToken;
+
+  /// Uses the device-generated attestation token to perform a secure handshake.
+  /// The server will verify the token and return a session token.
 
   /// Generates a list of words for the given [topic].
   ///
@@ -37,7 +49,7 @@ class ApiService {
         final body = jsonEncode({'topic': topic});
         final bodyBytes = utf8.encode(body);
 
-        final response = await http.post(
+        final response = await _client.post(
           uri,
           headers: {
             'content-type': 'application/json',
@@ -60,7 +72,7 @@ class ApiService {
 
   /// Helper for making authenticated requests with auto-retry logic.
   ///
-  /// [requestBuilder] is a function that takes a token and returns a Future<Response>.
+  /// [requestBuilder] is a function that takes a token and returns a ``Future<Response>``.
   /// [responseParser] is a function that takes a Response and returns the detailed result T.
   static Future<T> _authenticatedRequest<T>(
     Future<http.Response> Function(String token) requestBuilder,
@@ -158,7 +170,7 @@ class ApiService {
 
     // C. Send the signed attestation object to verify-device.
     final uri = Uri.parse(_verifyDeviceEndpoint);
-    final response = await http.post(
+    final response = await _client.post(
       uri,
       headers: {
         'content-type': 'application/json',
@@ -190,7 +202,7 @@ class ApiService {
 
   static Future<String?> _getChallenge() async {
     try {
-      final response = await http.get(Uri.parse(_challengeEndpoint));
+      final response = await _client.get(Uri.parse(_challengeEndpoint));
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         return data['challenge'] as String?;

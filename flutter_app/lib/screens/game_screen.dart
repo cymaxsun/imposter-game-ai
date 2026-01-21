@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
-import 'dart:ui';
 
 import 'package:flutter/widget_previews.dart';
+import 'package:auto_size_text/auto_size_text.dart';
 import '../theme/app_theme.dart';
 
 /// Layout and sizing constants for the game screen.
@@ -69,7 +69,6 @@ class GameScreenConstants {
 }
 
 /// The main game screen where players view their roles.
-
 class GameScreen extends StatefulWidget {
   final int playerCount;
   final List<String> playerNames;
@@ -102,7 +101,7 @@ class _GameScreenState extends State<GameScreen>
   late String _secretWord;
   late String _decoyWord;
   final List<int> _imposterIndices = [];
-  bool _useDecoyWord = false;
+  late bool _useDecoyWord;
 
   int _currentPlayerIndex = 0;
   bool _isFront = true;
@@ -132,13 +131,11 @@ class _GameScreenState extends State<GameScreen>
     // Determine number of imposters
     int numImposters = widget.imposterCountSetting;
     if (numImposters == -1) {
-      // Random: pick any number from 0 to playerCount
       numImposters = Random().nextInt(widget.playerCount + 1);
     }
-    // Safety cap: at minimum 0, at maximum playerCount
     numImposters = numImposters.clamp(0, widget.playerCount);
 
-    // Assign roles
+    // Assignment logic preserved
     final random = Random();
     while (_imposterIndices.length < numImposters) {
       int index = random.nextInt(widget.playerCount);
@@ -148,20 +145,16 @@ class _GameScreenState extends State<GameScreen>
       }
     }
 
-    // Select secret word
     _secretWord = widget.words[random.nextInt(widget.words.length)];
 
-    // Select decoy word (must be different from secret word)
     if (_useDecoyWord) {
       List<String> remainingWords = List.from(widget.words)
         ..remove(_secretWord);
-
       if (remainingWords.isNotEmpty) {
         _decoyWord = remainingWords[random.nextInt(remainingWords.length)];
       } else {
-        // Fallback if category has only 1 word (unlikely but safe)
         _decoyWord = _secretWord;
-        _useDecoyWord = false; // Disable if we can't find a different word
+        _useDecoyWord = false;
       }
     } else {
       _decoyWord = '';
@@ -176,7 +169,7 @@ class _GameScreenState extends State<GameScreen>
     }
     setState(() => _isFront = !_isFront);
 
-    if (widget.timeLimitSeconds > 0) {
+    if (widget.timeLimitSeconds > 0 && _timeLeft == null) {
       _timeLeft = Duration(seconds: widget.timeLimitSeconds);
     }
   }
@@ -208,11 +201,13 @@ class _GameScreenState extends State<GameScreen>
     if (!_isFront) {
       _controller.duration = const Duration(milliseconds: 300);
       _controller.reverse().then((_) {
-        setState(() {
-          _isFront = true;
-          _currentPlayerIndex++;
-          _controller.duration = const Duration(milliseconds: 600);
-        });
+        if (mounted) {
+          setState(() {
+            _isFront = true;
+            _currentPlayerIndex++;
+            _controller.duration = const Duration(milliseconds: 600);
+          });
+        }
       });
     } else {
       setState(() => _currentPlayerIndex++);
@@ -252,138 +247,36 @@ class _GameScreenState extends State<GameScreen>
       );
     }
 
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
     final gameColors =
         Theme.of(context).extension<GameScreenColors>() ??
         GameScreenColors.light;
 
     return Scaffold(
-      backgroundColor: colorScheme.surface,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       body: SafeArea(
         child: Column(
           children: [
-            // Header section
-            Expanded(
-              flex: GameScreenConstants.headerFlex,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    'Next Role',
-                    style: textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: gameColors.headerText,
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Ready to discover who you are?',
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: gameColors.headerSubtext,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            // Card section
+            _HeaderSection(gameColors: gameColors),
             Expanded(
               flex: GameScreenConstants.cardFlex,
-              child: Semantics(
-                button: true,
-                label: _isFront
-                    ? '${widget.playerNames[_currentPlayerIndex]} card. Tap to reveal your role.'
-                    : 'Card revealed. View your role.',
-                child: GestureDetector(
-                  onTap: _flipCard,
-                  child: AnimatedBuilder(
-                    animation: _animation,
-                    builder: (context, child) {
-                      final angle = _animation.value * pi;
-                      final transform = Matrix4.identity()
-                        ..setEntry(3, 2, 0.001)
-                        ..rotateY(angle);
-
-                      return Transform(
-                        transform: transform,
-                        alignment: Alignment.center,
-                        child: _animation.value < 0.5
-                            ? _CardFront(
-                                key: const ValueKey('card_front'),
-                                playerName:
-                                    widget.playerNames[_currentPlayerIndex],
-                              )
-                            : Transform(
-                                transform: Matrix4.identity()..rotateY(pi),
-                                alignment: Alignment.center,
-                                child: _CardBack(
-                                  key: const ValueKey('card_back'),
-                                  isImposter:
-                                      _playerRoles[_currentPlayerIndex] == 1,
-                                  secretWord: _secretWord,
-                                  decoyWord: _useDecoyWord ? _decoyWord : null,
-                                  hint: widget.showImposterHints
-                                      ? widget.categoryMap[_secretWord]
-                                      : null,
-                                ),
-                              ),
-                      );
-                    },
-                  ),
-                ),
+              child: _RoleCard(
+                animation: _animation,
+                isFront: _isFront,
+                playerName: widget.playerNames[_currentPlayerIndex],
+                isImposter: _playerRoles[_currentPlayerIndex] == 1,
+                secretWord: _secretWord,
+                decoyWord: _useDecoyWord ? _decoyWord : null,
+                hint: widget.showImposterHints
+                    ? widget.categoryMap[_secretWord]
+                    : null,
+                onFlip: _flipCard,
               ),
             ),
-            // Button section
-            Expanded(
-              flex: GameScreenConstants.buttonFlex,
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: GameScreenConstants.buttonPaddingHorizontal,
-                  ),
-                  child: AnimatedOpacity(
-                    duration: const Duration(milliseconds: 200),
-                    opacity: _isFront ? 0.4 : 1.0,
-                    child: FilledButton(
-                      onPressed: _isFront ? null : _nextPlayer,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: gameColors.buttonPrimary,
-                        disabledBackgroundColor: gameColors.buttonPrimary,
-                        minimumSize: const Size(double.infinity, 56),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(
-                            GameScreenConstants.buttonBorderRadius,
-                          ),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            _currentPlayerIndex == widget.playerCount - 1
-                                ? Icons.play_arrow_rounded
-                                : Icons.arrow_forward_rounded,
-                            size: GameScreenConstants.buttonIconSize,
-                            color: gameColors.buttonText,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            _currentPlayerIndex == widget.playerCount - 1
-                                ? 'START GAME'
-                                : 'NEXT PLAYER',
-                            style: textTheme.labelLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: gameColors.buttonText,
-                              letterSpacing: 1,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
+            _ActionButton(
+              isFront: _isFront,
+              isLastPlayer: _currentPlayerIndex == widget.playerCount - 1,
+              gameColors: gameColors,
+              onPressed: _nextPlayer,
             ),
           ],
         ),
@@ -392,11 +285,173 @@ class _GameScreenState extends State<GameScreen>
   }
 }
 
-/// The front of the role card (tap to reveal).
+class _HeaderSection extends StatelessWidget {
+  final GameScreenColors gameColors;
+
+  const _HeaderSection({required this.gameColors});
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Expanded(
+      flex: GameScreenConstants.headerFlex,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            'Next Role',
+            style: textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: gameColors.headerText,
+              letterSpacing: -0.5,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Ready to discover who you are?',
+            style: textTheme.bodyMedium?.copyWith(
+              color: gameColors.headerSubtext,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RoleCard extends StatelessWidget {
+  final Animation<double> animation;
+  final bool isFront;
+  final String playerName;
+  final bool isImposter;
+  final String secretWord;
+  final String? decoyWord;
+  final String? hint;
+  final VoidCallback onFlip;
+
+  const _RoleCard({
+    required this.animation,
+    required this.isFront,
+    required this.playerName,
+    required this.isImposter,
+    required this.secretWord,
+    this.decoyWord,
+    this.hint,
+    required this.onFlip,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: isFront
+          ? '$playerName card. Tap to reveal your role.'
+          : 'Card revealed. View your role.',
+      child: GestureDetector(
+        onTap: onFlip,
+        child: AnimatedBuilder(
+          animation: animation,
+          builder: (context, child) {
+            final angle = animation.value * pi;
+            final transform = Matrix4.identity()
+              ..setEntry(3, 2, 0.001)
+              ..rotateY(angle);
+
+            return Transform(
+              transform: transform,
+              alignment: Alignment.center,
+              child: animation.value < 0.5
+                  ? _CardFront(playerName: playerName)
+                  : Transform(
+                      transform: Matrix4.identity()..rotateY(pi),
+                      alignment: Alignment.center,
+                      child: _CardBack(
+                        isImposter: isImposter,
+                        secretWord: secretWord,
+                        decoyWord: decoyWord,
+                        hint: hint,
+                      ),
+                    ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _ActionButton extends StatelessWidget {
+  final bool isFront;
+  final bool isLastPlayer;
+  final GameScreenColors gameColors;
+  final VoidCallback onPressed;
+
+  const _ActionButton({
+    required this.isFront,
+    required this.isLastPlayer,
+    required this.gameColors,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Expanded(
+      flex: GameScreenConstants.buttonFlex,
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: GameScreenConstants.buttonPaddingHorizontal,
+          ),
+          child: AnimatedOpacity(
+            duration: const Duration(milliseconds: 200),
+            opacity: isFront ? 0.4 : 1.0,
+            child: FilledButton(
+              onPressed: isFront ? null : onPressed,
+              style: FilledButton.styleFrom(
+                backgroundColor: gameColors.buttonPrimary,
+                disabledBackgroundColor: gameColors.buttonPrimary,
+                minimumSize: const Size(double.infinity, 56),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(
+                    GameScreenConstants.buttonBorderRadius,
+                  ),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    isLastPlayer
+                        ? Icons.play_arrow_rounded
+                        : Icons.arrow_forward_rounded,
+                    size: GameScreenConstants.buttonIconSize,
+                    color: gameColors.buttonText,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    isLastPlayer ? 'START GAME' : 'NEXT PLAYER',
+                    style: textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: gameColors.buttonText,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _CardFront extends StatefulWidget {
   final String playerName;
 
-  const _CardFront({super.key, required this.playerName});
+  const _CardFront({required this.playerName});
 
   @override
   State<_CardFront> createState() => _CardFrontState();
@@ -412,7 +467,7 @@ class _CardFrontState extends State<_CardFront>
     super.initState();
     _pulseController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2500),
+      duration: GameScreenConstants.pulseAnimationDuration,
     )..repeat();
     _pulseAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
@@ -480,7 +535,6 @@ class _CardFrontState extends State<_CardFront>
               child: Stack(
                 alignment: Alignment.center,
                 children: [
-                  // Decorative radial gradient background
                   Positioned.fill(
                     child: DecoratedBox(
                       decoration: BoxDecoration(
@@ -496,14 +550,12 @@ class _CardFrontState extends State<_CardFront>
                       ),
                     ),
                   ),
-                  // Main content
                   FractionallySizedBox(
                     widthFactor: 0.65,
                     heightFactor: 0.65,
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        // Question mark icon in circular container
                         Expanded(
                           flex: 6,
                           child: FittedBox(
@@ -522,7 +574,6 @@ class _CardFrontState extends State<_CardFront>
                           ),
                         ),
                         const SizedBox(height: 16),
-                        // "SECRET" text
                         Expanded(
                           flex: 2,
                           child: FittedBox(
@@ -537,7 +588,6 @@ class _CardFrontState extends State<_CardFront>
                           ),
                         ),
                         const SizedBox(height: 12),
-                        // Instruction text
                         Expanded(
                           flex: 0,
                           child: FittedBox(
@@ -551,7 +601,6 @@ class _CardFrontState extends State<_CardFront>
                           ),
                         ),
                         const SizedBox(height: 16),
-                        // Player name badge
                         Expanded(
                           flex: 2,
                           child: Container(
@@ -575,7 +624,6 @@ class _CardFrontState extends State<_CardFront>
                           ),
                         ),
                         const SizedBox(height: 16),
-                        // "TAP TO REVEAL ROLE" text (not a button)
                         Expanded(
                           flex: 1,
                           child: FittedBox(
@@ -613,7 +661,6 @@ class _CardFrontState extends State<_CardFront>
   }
 }
 
-/// The back of the role card showing role and secret word.
 class _CardBack extends StatelessWidget {
   final bool isImposter;
   final String secretWord;
@@ -621,7 +668,6 @@ class _CardBack extends StatelessWidget {
   final String? hint;
 
   const _CardBack({
-    super.key,
     required this.isImposter,
     required this.secretWord,
     this.decoyWord,
@@ -635,10 +681,8 @@ class _CardBack extends StatelessWidget {
         Theme.of(context).extension<GameScreenColors>() ??
         GameScreenColors.light;
 
-    // Determine if showing imposter (without decoy word = true imposter)
     final showingAsImposter = isImposter && decoyWord == null;
 
-    // Get colors from theme
     final bgColor = showingAsImposter
         ? gameColors.imposterBackground
         : gameColors.innocentBackground;
@@ -676,7 +720,6 @@ class _CardBack extends StatelessWidget {
         child: Stack(
           alignment: Alignment.center,
           children: [
-            // Decorative background icon
             Positioned.fill(
               child: FittedBox(
                 fit: BoxFit.contain,
@@ -692,14 +735,12 @@ class _CardBack extends StatelessWidget {
                 ),
               ),
             ),
-            // Foreground content
             FractionallySizedBox(
               heightFactor: 0.7,
               widthFactor: 0.7,
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Icon in circle
                   Expanded(
                     flex: 3,
                     child: FittedBox(
@@ -719,9 +760,7 @@ class _CardBack extends StatelessWidget {
                       ),
                     ),
                   ),
-
                   const SizedBox(height: 12),
-                  // Role title
                   Expanded(
                     flex: 2,
                     child: FittedBox(
@@ -736,7 +775,6 @@ class _CardBack extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  // Subtitle
                   Expanded(
                     flex: 0,
                     child: FittedBox(
@@ -753,18 +791,13 @@ class _CardBack extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  // Word/Category box - hide for imposters without hints
                   if (!showingAsImposter || hint != null)
                     Expanded(
                       flex: 4,
                       child: Container(
                         width: 300,
                         decoration: BoxDecoration(
-                          color: showingAsImposter
-                              ? gameColors.imposterAccent.withValues(alpha: 0.1)
-                              : gameColors.innocentAccent.withValues(
-                                  alpha: 0.1,
-                                ),
+                          color: accentColor.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(
                             GameScreenConstants.wordBoxBorderRadius,
                           ),
@@ -773,48 +806,54 @@ class _CardBack extends StatelessWidget {
                           ),
                         ),
                         child: FractionallySizedBox(
-                          widthFactor: 0.75,
-                          heightFactor: 0.6,
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              FittedBox(
-                                child: Text(
-                                  showingAsImposter
-                                      ? 'CATEGORY'
-                                      : 'SECRET WORD',
-                                  style: textTheme.labelSmall?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: mutedColor.withValues(alpha: 0.6),
-                                    letterSpacing: 4,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                  maxLines: 1,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Flexible(
-                                child: FittedBox(
-                                  fit: BoxFit.scaleDown,
-                                  child: Text(
-                                    showingAsImposter
-                                        ? (hint ?? 'UNKNOWN').toUpperCase()
-                                        : ((isImposter && decoyWord != null)
-                                                  ? decoyWord!
-                                                  : secretWord)
-                                              .toUpperCase(),
-                                    style: textTheme.headlineMedium?.copyWith(
-                                      fontWeight: FontWeight.w900,
-                                      color: textColor,
-                                      letterSpacing: -1,
+                          widthFactor: 0.7,
+                          heightFactor: 0.8,
+                          child: FittedBox(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                if (showingAsImposter) ...[
+                                  _InfoRow(
+                                    label: 'CATEGORY',
+                                    value: (hint ?? 'UNKNOWN').toUpperCase(),
+                                    isCategory: true,
+                                    isVertical: true,
+                                    labelStyle: textTheme.labelSmall?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color: mutedColor.withValues(alpha: 0.6),
+                                      letterSpacing: 4,
                                     ),
-                                    textAlign: TextAlign.center,
-                                    maxLines: 2,
-                                    softWrap: true,
+                                    valueStyle: textTheme.headlineMedium
+                                        ?.copyWith(
+                                          fontWeight: FontWeight.w900,
+                                          color: textColor,
+                                          letterSpacing: -1,
+                                        ),
                                   ),
-                                ),
-                              ),
-                            ],
+                                ] else ...[
+                                  _InfoRow(
+                                    label: 'SECRET WORD',
+                                    value:
+                                        (isImposter && decoyWord != null
+                                                ? decoyWord!
+                                                : secretWord)
+                                            .toUpperCase(),
+                                    isVertical: true,
+                                    labelStyle: textTheme.labelSmall?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color: mutedColor.withValues(alpha: 0.6),
+                                      letterSpacing: 4,
+                                    ),
+                                    valueStyle: textTheme.headlineMedium
+                                        ?.copyWith(
+                                          fontWeight: FontWeight.w900,
+                                          color: textColor,
+                                          letterSpacing: -1,
+                                        ),
+                                  ),
+                                ],
+                              ],
+                            ),
                           ),
                         ),
                       ),
@@ -870,7 +909,7 @@ class _DiscussionViewState extends State<_DiscussionView>
     super.initState();
     _revealController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1200),
+      duration: const Duration(milliseconds: 2000),
     );
     _revealAnimation = CurvedAnimation(
       parent: _revealController,
@@ -901,16 +940,11 @@ class _DiscussionViewState extends State<_DiscussionView>
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
     final gameColors =
         Theme.of(context).extension<GameScreenColors>() ??
         GameScreenColors.light;
 
-    // Discussion view colors
-    const timerAccent = Color(0xFFD4A017); // Gold/Yellow
-    final titleAccent = gameColors.cardFrontPrimary; // Navy blue
-
-    // Calculate progress
+    const timerAccent = Color(0xFFD4A017);
     final progress = widget.timeLimitSeconds > 0 && widget.timeLeft != null
         ? widget.timeLeft!.inSeconds / widget.timeLimitSeconds
         : 1.0;
@@ -923,516 +957,30 @@ class _DiscussionViewState extends State<_DiscussionView>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Timer Section - only show when not revealed
               if (!widget.imposterRevealed)
-                Expanded(
-                  flex: 1,
-                  child: FittedBox(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        if (widget.timeLimitSeconds > 0 &&
-                            widget.timeLeft != null) ...[
-                          // "DISCUSSION REMAINING" label
-                          Text(
-                            'DISCUSSION REMAINING',
-                            style: textTheme.labelSmall?.copyWith(
-                              color: colorScheme.onSurface.withValues(
-                                alpha: 0.5,
-                              ),
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 2,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-
-                          // Timer pill badge
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 24,
-                              vertical: 12,
-                            ),
-                            decoration: BoxDecoration(
-                              color: colorScheme.surface,
-                              borderRadius: BorderRadius.circular(30),
-                              border: Border.all(
-                                color: colorScheme.onSurface.withValues(
-                                  alpha: 0.1,
-                                ),
-                                width: 1,
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.timer_outlined,
-                                  color: timerAccent,
-                                  size: 28,
-                                ),
-                                const SizedBox(width: 12),
-                                Text(
-                                  _formatTime(widget.timeLeft!),
-                                  style: textTheme.headlineMedium?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: colorScheme.onSurface,
-                                    fontFeatures: const [
-                                      FontFeature.tabularFigures(),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-
-                          // Linear progress bar
-                          Container(
-                            height: 6,
-                            width: 200,
-                            decoration: BoxDecoration(
-                              color: colorScheme.onSurface.withValues(
-                                alpha: 0.1,
-                              ),
-                              borderRadius: BorderRadius.circular(3),
-                            ),
-                            child: FractionallySizedBox(
-                              alignment: Alignment.centerLeft,
-                              widthFactor: progress.clamp(0.0, 1.0),
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  gradient: const LinearGradient(
-                                    colors: [timerAccent, Color(0xFFE8C547)],
-                                  ),
-                                  borderRadius: BorderRadius.circular(3),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
+                _TimerSection(
+                  text: widget.timeLeft != null
+                      ? _formatTime(widget.timeLeft!)
+                      : '--:--',
+                  progress: progress,
+                  timerAccent: timerAccent,
                 ),
-              // Main Title Section - use Stack when revealed for floating button
               Expanded(
                 flex: widget.imposterRevealed ? 6 : 4,
                 child: widget.imposterRevealed
-                    ? Stack(
-                        children: [
-                          // Scrollable content
-                          Positioned.fill(
-                            child: AnimatedBuilder(
-                              key: const ValueKey('revealed'),
-                              animation: _revealAnimation,
-                              builder: (context, child) {
-                                return Center(
-                                  child: SingleChildScrollView(
-                                    padding: const EdgeInsets.only(
-                                      bottom: GameScreenConstants
-                                          .scrollBottomPadding,
-                                    ),
-
-                                    child: Container(
-                                      width: double.infinity,
-                                      padding: const EdgeInsets.all(24),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white,
-                                        borderRadius: BorderRadius.circular(24),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black.withValues(
-                                              alpha: 0.08,
-                                            ),
-                                            blurRadius: 20,
-                                            offset: const Offset(0, 8),
-                                          ),
-                                        ],
-                                      ),
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          // "The Imposters were..." title
-                                          Opacity(
-                                            opacity:
-                                                Interval(
-                                                  0.0,
-                                                  0.4,
-                                                  curve: Curves.easeOut,
-                                                ).transform(
-                                                  _revealController.value,
-                                                ),
-                                            child: Text(
-                                              widget.imposterNames.length == 1
-                                                  ? 'The Imposter\nwas...'
-                                                  : 'The Imposters\nwere...',
-                                              style: textTheme.headlineMedium
-                                                  ?.copyWith(
-                                                    fontWeight: FontWeight.bold,
-                                                    color:
-                                                        colorScheme.onSurface,
-                                                    height: 1.2,
-                                                  ),
-                                              textAlign: TextAlign.center,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 24),
-
-                                          // Imposter cards
-                                          ...widget.imposterNames.asMap().entries.map((
-                                            entry,
-                                          ) {
-                                            final index = entry.key;
-                                            final name = entry.value;
-
-                                            return Opacity(
-                                              opacity:
-                                                  Interval(
-                                                    (0.2 + (index * 0.05))
-                                                        .clamp(0.0, 0.9),
-                                                    (0.5 + (index * 0.05))
-                                                        .clamp(0.1, 1.0),
-                                                    curve: Curves.easeOut,
-                                                  ).transform(
-                                                    _revealController.value,
-                                                  ),
-                                              child: Transform.scale(
-                                                scale:
-                                                    Interval(
-                                                      (0.2 + (index * 0.05))
-                                                          .clamp(0.0, 0.9),
-                                                      (0.6 + (index * 0.05))
-                                                          .clamp(0.1, 1.0),
-                                                      curve: Curves.elasticOut,
-                                                    ).transform(
-                                                      _revealController.value,
-                                                    ),
-                                                child: Container(
-                                                  margin: EdgeInsets.only(
-                                                    bottom:
-                                                        index <
-                                                            widget
-                                                                    .imposterNames
-                                                                    .length -
-                                                                1
-                                                        ? 8
-                                                        : 0,
-                                                  ),
-                                                  padding:
-                                                      const EdgeInsets.symmetric(
-                                                        horizontal: 12,
-                                                        vertical: 10,
-                                                      ),
-                                                  decoration: BoxDecoration(
-                                                    color: Colors.grey.shade100,
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          50,
-                                                        ),
-                                                  ),
-                                                  child: Row(
-                                                    children: [
-                                                      // Icon in circle
-                                                      Container(
-                                                        width: 36,
-                                                        height: 36,
-                                                        decoration:
-                                                            BoxDecoration(
-                                                              color:
-                                                                  const Color(
-                                                                    0xFFFFE0E0,
-                                                                  ),
-                                                              shape: BoxShape
-                                                                  .circle,
-                                                            ),
-                                                        child: Icon(
-                                                          Icons.theater_comedy,
-                                                          color: const Color(
-                                                            0xFFE53935,
-                                                          ),
-                                                          size: 18,
-                                                        ),
-                                                      ),
-                                                      const SizedBox(width: 10),
-                                                      // Name only
-                                                      Expanded(
-                                                        child: Text(
-                                                          name,
-                                                          style: textTheme
-                                                              .titleSmall
-                                                              ?.copyWith(
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .bold,
-                                                                color: colorScheme
-                                                                    .onSurface,
-                                                              ),
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                              ),
-                                            );
-                                          }),
-
-                                          const SizedBox(height: 24),
-
-                                          // Divider
-                                          Opacity(
-                                            opacity:
-                                                Interval(
-                                                  0.5,
-                                                  0.9,
-                                                  curve: Curves.easeOut,
-                                                ).transform(
-                                                  _revealController.value,
-                                                ),
-                                            child: Divider(
-                                              color: Colors.grey.shade200,
-                                              thickness: 1,
-                                            ),
-                                          ),
-
-                                          const SizedBox(height: 16),
-
-                                          // Secret word and category
-                                          Opacity(
-                                            opacity:
-                                                Interval(
-                                                  0.5,
-                                                  0.9,
-                                                  curve: Curves.easeOut,
-                                                ).transform(
-                                                  _revealController.value,
-                                                ),
-                                            child: Column(
-                                              children: [
-                                                // Secret Word row
-                                                Row(
-                                                  children: [
-                                                    Text(
-                                                      'SECRET WORD',
-                                                      style: textTheme
-                                                          .labelSmall
-                                                          ?.copyWith(
-                                                            color: Colors
-                                                                .grey
-                                                                .shade500,
-                                                            letterSpacing: 1,
-                                                            fontWeight:
-                                                                FontWeight.w600,
-                                                          ),
-                                                    ),
-                                                    const Spacer(),
-                                                    Text(
-                                                      widget.secretWord,
-                                                      style: textTheme
-                                                          .titleMedium
-                                                          ?.copyWith(
-                                                            fontWeight:
-                                                                FontWeight.bold,
-                                                            color: colorScheme
-                                                                .onSurface,
-                                                          ),
-                                                    ),
-                                                  ],
-                                                ),
-                                                if (widget.category !=
-                                                    null) ...[
-                                                  const SizedBox(height: 12),
-                                                  // Category row
-                                                  Row(
-                                                    children: [
-                                                      Text(
-                                                        'CATEGORY',
-                                                        style: textTheme
-                                                            .labelSmall
-                                                            ?.copyWith(
-                                                              color: Colors
-                                                                  .grey
-                                                                  .shade500,
-                                                              letterSpacing: 1,
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .w600,
-                                                            ),
-                                                      ),
-                                                      const Spacer(),
-                                                      Row(
-                                                        children: [
-                                                          Icon(
-                                                            Icons
-                                                                .bookmark_outline,
-                                                            size: 18,
-                                                            color: colorScheme
-                                                                .onSurface,
-                                                          ),
-                                                          const SizedBox(
-                                                            width: 4,
-                                                          ),
-                                                          Text(
-                                                            widget.category!,
-                                                            style: textTheme
-                                                                .titleMedium
-                                                                ?.copyWith(
-                                                                  fontWeight:
-                                                                      FontWeight
-                                                                          .bold,
-                                                                  color: colorScheme
-                                                                      .onSurface,
-                                                                ),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ],
-                                              ],
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                          // Floating Play Again button
-                          Positioned(
-                            left: 0,
-                            right: 0,
-                            bottom: 0,
-                            child: Container(
-                              padding: const EdgeInsets.only(top: 16),
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
-                                  colors: [
-                                    colorScheme.surface.withValues(alpha: 0.0),
-                                    colorScheme.surface,
-                                  ],
-                                  stops: const [0.0, 0.4],
-                                ),
-                              ),
-                              child: FilledButton(
-                                onPressed: widget.onEndGame,
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: const Color(0xFF4CAF50),
-                                  minimumSize: const Size(double.infinity, 56),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(
-                                      GameScreenConstants.buttonBorderRadius,
-                                    ),
-                                  ),
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.refresh_rounded,
-                                      size: GameScreenConstants.buttonIconSize,
-                                      color: Colors.white,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      'Play Again',
-                                      style: textTheme.labelLarge?.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.white,
-                                        letterSpacing: 1,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
+                    ? _ImposterRevealView(
+                        animation: _revealAnimation,
+                        imposterNames: widget.imposterNames,
+                        secretWord: widget.secretWord,
+                        category: widget.category,
+                        onEndGame: widget.onEndGame,
                       )
-                    : Center(
-                        child: AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 400),
-                          child: FittedBox(
-                            fit: BoxFit.contain,
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              key: const ValueKey('question'),
-                              children: [
-                                // "Who is the"
-                                Text(
-                                  'Who is the',
-                                  style: textTheme.displayMedium?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: colorScheme.onSurface,
-                                  ),
-                                ),
-                                // "Imposter?"
-                                Text(
-                                  'Imposter?',
-                                  style: textTheme.displayMedium?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: colorScheme.onSurface,
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                // Subtitle
-                                Text(
-                                  'Discuss with your group and\ntry to identify the imposter',
-                                  textAlign: TextAlign.center,
-                                  style: textTheme.bodyMedium?.copyWith(
-                                    color: colorScheme.onSurface.withValues(
-                                      alpha: 0.6,
-                                    ),
-                                    height: 1.5,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
+                    : const _WhoIsTheImposterSection(),
               ),
-
-              // Button Section - only show when NOT revealed
               if (!widget.imposterRevealed)
-                Expanded(
-                  flex: GameScreenConstants.buttonFlex,
-                  child: Center(
-                    child: FilledButton(
-                      onPressed: widget.onReveal,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: gameColors.buttonPrimary,
-                        minimumSize: const Size(double.infinity, 56),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(
-                            GameScreenConstants.buttonBorderRadius,
-                          ),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.visibility_rounded,
-                            size: GameScreenConstants.buttonIconSize,
-                            color: gameColors.buttonText,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'REVEAL IMPOSTER',
-                            style: textTheme.labelLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: gameColors.buttonText,
-                              letterSpacing: 1,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+                _RevealButton(
+                  onReveal: widget.onReveal,
+                  gameColors: gameColors,
                 ),
             ],
           ),
@@ -1448,15 +996,582 @@ class _DiscussionViewState extends State<_DiscussionView>
   }
 }
 
+class _TimerSection extends StatelessWidget {
+  final String text;
+  final double progress;
+  final Color timerAccent;
+
+  const _TimerSection({
+    required this.text,
+    required this.progress,
+    required this.timerAccent,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+
+    return Expanded(
+      flex: 1,
+      child: FittedBox(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              'DISCUSSION REMAINING',
+              style: textTheme.labelSmall?.copyWith(
+                color: onSurface.withValues(alpha: 0.5),
+                fontWeight: FontWeight.bold,
+                letterSpacing: 2,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: BorderRadius.circular(30),
+                border: Border.all(
+                  color: onSurface.withValues(alpha: 0.1),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.timer_outlined, color: timerAccent, size: 28),
+                  const SizedBox(width: 12),
+                  Text(
+                    text,
+                    style: textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: onSurface,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            Container(
+              height: 6,
+              width: 200,
+              decoration: BoxDecoration(
+                color: onSurface.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(3),
+              ),
+              child: FractionallySizedBox(
+                alignment: Alignment.centerLeft,
+                widthFactor: progress.clamp(0.0, 1.0),
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [timerAccent, timerAccent.withValues(alpha: 0.7)],
+                    ),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ImposterRevealView extends StatelessWidget {
+  final Animation<double> animation;
+  final List<String> imposterNames;
+  final String secretWord;
+  final String? category;
+  final VoidCallback onEndGame;
+
+  const _ImposterRevealView({
+    required this.animation,
+    required this.imposterNames,
+    required this.secretWord,
+    this.category,
+    required this.onEndGame,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: AnimatedBuilder(
+            animation: animation,
+            builder: (context, child) {
+              return Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.only(
+                    bottom: GameScreenConstants.scrollBottomPadding,
+                  ),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.08),
+                          blurRadius: 20,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _RevealTitle(
+                          namesCount: imposterNames.length,
+                          animation: animation,
+                        ),
+                        const SizedBox(height: 24),
+                        ...imposterNames.asMap().entries.map(
+                          (entry) => _ImposterNameCard(
+                            index: entry.key,
+                            name: entry.value,
+                            animation: animation,
+                            total: imposterNames.length,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        _RevealDivider(animation: animation),
+                        const SizedBox(height: 16),
+                        _RevealSecretInfo(
+                          secretWord: secretWord,
+                          category: category,
+                          animation: animation,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        _PlayAgainButton(onEndGame: onEndGame),
+      ],
+    );
+  }
+}
+
+class _RevealTitle extends StatelessWidget {
+  final int namesCount;
+  final Animation<double> animation;
+
+  const _RevealTitle({required this.namesCount, required this.animation});
+
+  @override
+  Widget build(BuildContext context) {
+    // Clamp to avoid curves potentially overshooting
+    final opacityValue = Interval(
+      0.0,
+      0.4,
+      curve: Curves.easeOut,
+    ).transform(animation.value.clamp(0.0, 1.0)).clamp(0.0, 1.0);
+
+    return Opacity(
+      opacity: opacityValue,
+      child: Text(
+        namesCount == 1 ? 'The Imposter\nwas...' : 'The Imposters\nwere...',
+        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+          fontWeight: FontWeight.bold,
+          color: Theme.of(context).colorScheme.onSurface,
+          height: 1.2,
+        ),
+        textAlign: TextAlign.center,
+      ),
+    );
+  }
+}
+
+class _ImposterNameCard extends StatelessWidget {
+  final int index;
+  final String name;
+  final Animation<double> animation;
+  final int total;
+
+  const _ImposterNameCard({
+    required this.index,
+    required this.name,
+    required this.animation,
+    required this.total,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // Clamp opacity to avoid errors with curves that overshoot
+    final opacityValue = Interval(
+      (0.2 + (index * 0.05)).clamp(0.0, 0.9),
+      (0.5 + (index * 0.05)).clamp(0.1, 1.0),
+      curve: Curves.easeOut,
+    ).transform(animation.value.clamp(0.0, 1.0)).clamp(0.0, 1.0);
+
+    // elasticOut can overshoot, but scale handles values > 1.0 fine
+    final scaleValue = Interval(
+      (0.2 + (index * 0.05)).clamp(0.0, 0.9),
+      (0.6 + (index * 0.05)).clamp(0.1, 1.0),
+      curve: Curves.elasticOut,
+    ).transform(animation.value.clamp(0.0, 1.0));
+
+    return Opacity(
+      opacity: opacityValue,
+      child: Transform.scale(
+        scale: scaleValue,
+        child: Container(
+          margin: EdgeInsets.only(bottom: index < total - 1 ? 8 : 0),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(50),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFFFE0E0),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.theater_comedy,
+                  color: Color(0xFFE53935),
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  name,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RevealDivider extends StatelessWidget {
+  final Animation<double> animation;
+
+  const _RevealDivider({required this.animation});
+
+  @override
+  Widget build(BuildContext context) {
+    final opacityValue = Interval(
+      0.5,
+      0.9,
+      curve: Curves.easeOut,
+    ).transform(animation.value.clamp(0.0, 1.0)).clamp(0.0, 1.0);
+
+    return Opacity(
+      opacity: opacityValue,
+      child: Divider(color: Colors.grey.shade200, thickness: 1),
+    );
+  }
+}
+
+class _RevealSecretInfo extends StatelessWidget {
+  final String secretWord;
+  final String? category;
+  final Animation<double> animation;
+
+  const _RevealSecretInfo({
+    required this.secretWord,
+    this.category,
+    required this.animation,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final opacityValue = Interval(
+      0.5,
+      0.9,
+      curve: Curves.easeOut,
+    ).transform(animation.value.clamp(0.0, 1.0)).clamp(0.0, 1.0);
+
+    return Opacity(
+      opacity: opacityValue,
+      child: Column(
+        children: [
+          _InfoRow(label: 'SECRET WORD', value: secretWord),
+          if (category != null) ...[
+            const SizedBox(height: 12),
+            _InfoRow(label: 'CATEGORY', value: category!, isCategory: true),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _InfoRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final bool isCategory;
+  final bool isVertical;
+  final TextStyle? labelStyle;
+  final TextStyle? valueStyle;
+
+  const _InfoRow({
+    required this.label,
+    required this.value,
+    this.isCategory = false,
+    this.isVertical = false,
+    this.labelStyle,
+    this.valueStyle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+
+    final effectiveLabelStyle =
+        labelStyle ??
+        textTheme.labelSmall?.copyWith(
+          color: Colors.grey.shade500,
+          letterSpacing: 1,
+          fontWeight: FontWeight.w600,
+        );
+
+    final effectiveValueStyle =
+        valueStyle ??
+        textTheme.titleMedium?.copyWith(
+          fontWeight: FontWeight.bold,
+          color: onSurface,
+        );
+
+    Widget content;
+    if (isCategory) {
+      content = Row(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: isVertical
+            ? MainAxisAlignment.center
+            : MainAxisAlignment.end,
+        children: [
+          Icon(Icons.bookmark_outline, size: 18, color: onSurface),
+          const SizedBox(width: 4),
+          Flexible(
+            child: AutoSizeText(
+              value,
+              style: effectiveValueStyle,
+              maxLines: 2,
+              minFontSize: 10,
+              overflow: TextOverflow.ellipsis,
+              textAlign: isVertical ? TextAlign.center : TextAlign.end,
+            ),
+          ),
+        ],
+      );
+    } else {
+      content = AutoSizeText(
+        value,
+        style: effectiveValueStyle,
+        maxLines: 2,
+        minFontSize: 10,
+        overflow: TextOverflow.ellipsis,
+        textAlign: isVertical ? TextAlign.center : TextAlign.end,
+      );
+    }
+
+    if (isVertical) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label, style: effectiveLabelStyle, textAlign: TextAlign.center),
+          const SizedBox(height: 8),
+          Flexible(child: content),
+        ],
+      );
+    }
+
+    return Row(
+      children: [
+        Text(label, style: effectiveLabelStyle),
+        const SizedBox(width: 16),
+        Expanded(child: content),
+      ],
+    );
+  }
+}
+
+class _PlayAgainButton extends StatelessWidget {
+  final VoidCallback onEndGame;
+
+  const _PlayAgainButton({required this.onEndGame});
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      left: 0,
+      right: 0,
+      bottom: 0,
+      child: Container(
+        padding: const EdgeInsets.only(top: 16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Theme.of(context).colorScheme.surface.withValues(alpha: 0.0),
+              Theme.of(context).colorScheme.surface,
+            ],
+            stops: const [0.0, 0.4],
+          ),
+        ),
+        child: FilledButton(
+          onPressed: onEndGame,
+          style: FilledButton.styleFrom(
+            backgroundColor: const Color(0xFF4CAF50),
+            minimumSize: const Size(double.infinity, 56),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(
+                GameScreenConstants.buttonBorderRadius,
+              ),
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.refresh_rounded,
+                size: GameScreenConstants.buttonIconSize,
+                color: Colors.white,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Play Again',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  letterSpacing: 1,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _WhoIsTheImposterSection extends StatelessWidget {
+  const _WhoIsTheImposterSection();
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+
+    return Center(
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 400),
+        child: FittedBox(
+          fit: BoxFit.contain,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                'Who is the',
+                style: textTheme.displayMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: onSurface,
+                ),
+              ),
+              Text(
+                'Imposter?',
+                style: textTheme.displayMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: onSurface,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Discuss with your group and\ntry to identify the imposter',
+                textAlign: TextAlign.center,
+                style: textTheme.bodyMedium?.copyWith(
+                  color: onSurface.withValues(alpha: 0.6),
+                  height: 1.5,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RevealButton extends StatelessWidget {
+  final VoidCallback onReveal;
+  final GameScreenColors gameColors;
+
+  const _RevealButton({required this.onReveal, required this.gameColors});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      flex: GameScreenConstants.buttonFlex,
+      child: Center(
+        child: FilledButton(
+          onPressed: onReveal,
+          style: FilledButton.styleFrom(
+            backgroundColor: gameColors.buttonPrimary,
+            minimumSize: const Size(double.infinity, 56),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(
+                GameScreenConstants.buttonBorderRadius,
+              ),
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.visibility_rounded,
+                size: GameScreenConstants.buttonIconSize,
+                color: Colors.white,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'REVEAL IMPOSTER',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  letterSpacing: 1,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // ============================================================================
 // Widget Previews
 // ============================================================================
 
 @Preview(name: 'Card Front', size: Size(400, 600))
 Widget cardFrontPreview() {
-  return MaterialApp(
+  return const MaterialApp(
     home: Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor: Color(0xFFF5F5F5),
       body: Center(
         child: SizedBox(
           width: 350,
@@ -1470,89 +1585,14 @@ Widget cardFrontPreview() {
 
 @Preview(name: 'Card Back - Innocent', size: Size(400, 600))
 Widget cardBackInnocentPreview() {
-  return MaterialApp(
+  return const MaterialApp(
     home: Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor: Color(0xFFF5F5F5),
       body: Center(
         child: SizedBox(
           width: 350,
           height: 500,
           child: _CardBack(isImposter: false, secretWord: 'BANANA'),
-        ),
-      ),
-    ),
-  );
-}
-
-@Preview(name: 'Card Back - Innocent (Long Word)', size: Size(400, 600))
-Widget cardBackInnocentLongWordPreview() {
-  return MaterialApp(
-    home: Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
-      body: Center(
-        child: SizedBox(
-          width: 350,
-          height: 500,
-          child: _CardBack(
-            isImposter: false,
-            secretWord: 'SUPERCALIFRAGILISTICEXPIALIDOCIOUS',
-          ),
-        ),
-      ),
-    ),
-  );
-}
-
-@Preview(name: 'Card Back - Imposter (No Hint)', size: Size(400, 600))
-Widget cardBackImposterNoHintPreview() {
-  return MaterialApp(
-    home: Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
-      body: Center(
-        child: SizedBox(
-          width: 350,
-          height: 500,
-          child: _CardBack(isImposter: true, secretWord: 'BANANA', hint: null),
-        ),
-      ),
-    ),
-  );
-}
-
-@Preview(name: 'Card Back - Imposter (With Hint)', size: Size(400, 600))
-Widget cardBackImposterWithHintPreview() {
-  return MaterialApp(
-    home: Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
-      body: Center(
-        child: SizedBox(
-          width: 350,
-          height: 500,
-          child: _CardBack(
-            isImposter: true,
-            secretWord: 'BANANA',
-            hint: 'Fruits',
-          ),
-        ),
-      ),
-    ),
-  );
-}
-
-@Preview(name: 'Card Back - Decoy Word', size: Size(400, 600))
-Widget cardBackDecoyWordPreview() {
-  return MaterialApp(
-    home: Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
-      body: Center(
-        child: SizedBox(
-          width: 350,
-          height: 500,
-          child: _CardBack(
-            isImposter: true,
-            secretWord: 'BANANA',
-            decoyWord: 'APPLE',
-          ),
         ),
       ),
     ),
