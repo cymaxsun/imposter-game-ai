@@ -4,8 +4,10 @@ import 'dart:math';
 
 import 'game_screen.dart';
 import '../theme/app_theme.dart';
-import 'manage_categories_screen.dart';
+import 'ai_category_studio_screen.dart';
 import '../viewmodels/setup_view_model.dart';
+import 'category_gallery_screen.dart';
+import 'edit_category_screen.dart';
 import 'components/category_deck_sheet.dart';
 
 /// Stitch-inspired setup screen with pastel colors and friendly layout.
@@ -34,16 +36,17 @@ class _SetupScreenState extends State<SetupScreen> {
   }
 
   Future<void> _navigateToManageCategories() async {
-    final result = await Navigator.push<Map<String, List<String>>>(
+    final result = await Navigator.push<MapEntry<String, List<String>>>(
       context,
       MaterialPageRoute(
-        builder: (context) =>
-            ManageCategoriesScreen(initialCategories: _viewModel.categoryLists),
+        builder: (context) => AiCategoryStudioScreen(
+          existingCategoryNames: _viewModel.categoryLists.keys.toList(),
+        ),
       ),
     );
-    // If ManageCategoriesScreen returns updated categories, update ViewModel
+    // If AiCategoryStudioScreen returns a new category, add it
     if (result != null) {
-      _viewModel.updateCategories(result);
+      _viewModel.addCategory(result.key, result.value);
     }
   }
 
@@ -106,7 +109,7 @@ class _SetupScreenState extends State<SetupScreen> {
                           _CategoryCard(
                             selectedCategories:
                                 _viewModel.settings.selectedCategories,
-                            onTap: () => _showCategoryModal(context),
+                            onTap: () => _navigateToCategoryGallery(context),
                           ),
                           const SizedBox(height: 32),
                           _SectionHeader(
@@ -145,20 +148,48 @@ class _SetupScreenState extends State<SetupScreen> {
     );
   }
 
-  void _showCategoryModal(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+  Future<void> _navigateToEditCategory({String? initialCategory}) {
+    return Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => EditCategoryScreen(
+          initialCategoryName: initialCategory,
+          initialWords: initialCategory != null
+              ? _viewModel.categoryLists[initialCategory] ?? []
+              : [],
+          onSave: (newName, newWords) {
+            if (initialCategory != null && initialCategory != newName) {
+              _viewModel.deleteCategory(initialCategory);
+            }
+            _viewModel.addCategory(newName, newWords);
+
+            // If checking "Select after create":
+            // _viewModel.toggleCategory(newName);
+          },
+        ),
       ),
-      builder: (sheetContext) => ListenableBuilder(
-        listenable: _viewModel,
-        builder: (context, _) => CategoryDeckSheet(
-          availableCategories: _viewModel.availableCategories,
-          selectedCategories: _viewModel.settings.selectedCategories,
-          onToggle: _viewModel.toggleCategory,
+    );
+  }
+
+  void _navigateToCategoryGallery(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => ListenableBuilder(
+          listenable: _viewModel,
+          builder: (context, _) {
+            return CategoryGalleryScreen(
+              availableCategories: _viewModel.availableCategories,
+              initiallySelected: _viewModel.settings.selectedCategories,
+              onSelectionChanged: _viewModel.updateSelectedCategories,
+              wordCounts: {
+                for (var category in _viewModel.availableCategories)
+                  category: _viewModel.getCategoryWordCount(category),
+              },
+              onDelete: _viewModel.deleteCategory,
+              onCreate: () => _navigateToEditCategory(),
+              onEdit: (category) =>
+                  _navigateToEditCategory(initialCategory: category),
+            );
+          },
         ),
       ),
     );

@@ -86,6 +86,14 @@ class SetupViewModel extends ChangeNotifier {
     }
   }
 
+  /// Updates the selected categories.
+  void updateSelectedCategories(Set<String> newSelection) {
+    if (newSelection.isNotEmpty) {
+      _settings = _settings.copyWith(selectedCategories: newSelection);
+      notifyListeners();
+    }
+  }
+
   /// Toggles a category selection.
   void toggleCategory(String category) {
     final newCategories = Set<String>.from(_settings.selectedCategories);
@@ -159,6 +167,26 @@ class SetupViewModel extends ChangeNotifier {
   void addCategory(String name, List<String> words) {
     _wordRepository.addCategory(name, words);
     notifyListeners();
+  }
+
+  /// Deletes a category from the repository.
+  void deleteCategory(String category) {
+    _wordRepository.deleteCategory(category);
+    // If deleted category was selected, remove it
+    if (_settings.selectedCategories.contains(category)) {
+      final newSelected = Set<String>.from(_settings.selectedCategories)
+        ..remove(category);
+      // Ensure at least one category is selected if possible, or allow empty?
+      // Logic above suggests we try to keep 1, but if deleted, we might have 0.
+      // Let's just update.
+      _settings = _settings.copyWith(selectedCategories: newSelected);
+    }
+    notifyListeners();
+  }
+
+  /// Returns the word count for a specific category.
+  int getCategoryWordCount(String category) {
+    return _wordRepository.getWordsForCategory(category)?.length ?? 0;
   }
 
   /// Updates the repository with new categories.

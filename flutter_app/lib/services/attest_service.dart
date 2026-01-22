@@ -46,6 +46,7 @@ class AttestService {
       final token = await _plugin.getAttestationServiceSupport(
         challengeString: challenge,
       );
+      //  final String? token = null;
 
       if (token != null && token.isNotEmpty) {
         developer.log(

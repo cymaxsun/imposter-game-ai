@@ -79,6 +79,11 @@ class WordRepository {
     _categoryLists[name] = words;
   }
 
+  /// Deletes a category.
+  void deleteCategory(String name) {
+    _categoryLists.remove(name);
+  }
+
   /// Updates repository with new category lists.
   void updateCategories(Map<String, List<String>> newCategories) {
     _categoryLists.clear();

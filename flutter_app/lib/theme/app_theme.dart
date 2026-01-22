@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'pastel_theme.dart';
 
 /// Original color palette for the Imposter Finder app (classic warm tones).
 ///
@@ -411,6 +412,7 @@ class AppTheme {
           ),
         ),
         GameScreenColors.light,
+        PastelTheme.light,
       ],
     );
   }

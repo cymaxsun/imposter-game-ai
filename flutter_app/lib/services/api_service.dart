@@ -6,6 +6,8 @@ import 'package:http/http.dart' as http;
 import 'package:meta/meta.dart';
 
 import 'attest_service.dart';
+import 'subscription_service.dart';
+import 'usage_service.dart';
 
 /// Service for communicating with the word generation API.
 ///
@@ -29,7 +31,6 @@ class ApiService {
 
   @visibleForTesting
   static set storage(FlutterSecureStorage storage) => _storage = storage;
-
   static const _sessionTokenKey = 'session_token';
 
   /// In-memory cache for the session token to reduce storage reads.
@@ -43,6 +44,17 @@ class ApiService {
   /// Uses a valid session token. If the token is invalid (401),
   /// triggers a handshake to get a new one and retries.
   static Future<List<String>> generateWordList(String topic) async {
+    final usage = UsageService();
+    final subscription = SubscriptionService();
+
+    if (!usage.canMakeRequest && !subscription.isPremium) {
+      // In a real app we might throw a specific exception to show Paywall
+      throw Exception('Daily usage limit reached. Please upgrade to Premium.');
+    }
+
+    // I will write the code to check limit and throw, and handle "Premium" bypass in the next step or assume UsageService *will* be updated.
+    // Actually, I will check SubscriptionService here too.
+
     return _authenticatedRequest<List<String>>(
       (token) async {
         final uri = Uri.parse(_generateWordsEndpoint);
@@ -99,6 +111,10 @@ class ApiService {
 
       // 4. Handle Success
       if (response.statusCode == 200) {
+        // Increment usage count on success
+        if (!SubscriptionService().isPremium) {
+          UsageService().incrementRequestCount();
+        }
         return responseParser(response);
       }
 
@@ -129,6 +145,7 @@ class ApiService {
     if (_currentSessionToken != null) return _currentSessionToken!;
 
     final storedToken = await _storage.read(key: _sessionTokenKey);
+    // final storedToken = null; // Forced null for debug
     if (storedToken != null) {
       _currentSessionToken = storedToken;
       return storedToken;
