@@ -257,6 +257,7 @@ class _GameScreenState extends State<GameScreen>
         child: Column(
           children: [
             _HeaderSection(gameColors: gameColors),
+            const SizedBox(height: 16),
             Expanded(
               flex: GameScreenConstants.cardFlex,
               child: _RoleCard(
@@ -272,6 +273,7 @@ class _GameScreenState extends State<GameScreen>
                 onFlip: _flipCard,
               ),
             ),
+            const SizedBox(height: 16),
             _ActionButton(
               isFront: _isFront,
               isLastPlayer: _currentPlayerIndex == widget.playerCount - 1,
@@ -604,20 +606,20 @@ class _CardFrontState extends State<_CardFront>
                         Expanded(
                           flex: 2,
                           child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 32,
-                              vertical: 12,
-                            ),
                             decoration: BoxDecoration(
                               color: primaryNavy.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(25),
                             ),
-                            child: FittedBox(
-                              child: Text(
-                                widget.playerName.toUpperCase(),
-                                style: textTheme.bodyMedium?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: textDark,
+                            child: FractionallySizedBox(
+                              widthFactor: 0.6,
+                              heightFactor: 0.6,
+                              child: FittedBox(
+                                child: Text(
+                                  widget.playerName.toUpperCase(),
+                                  style: textTheme.bodyMedium?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: textDark,
+                                  ),
                                 ),
                               ),
                             ),
@@ -808,52 +810,57 @@ class _CardBack extends StatelessWidget {
                         child: FractionallySizedBox(
                           widthFactor: 0.7,
                           heightFactor: 0.8,
-                          child: FittedBox(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                if (showingAsImposter) ...[
-                                  _InfoRow(
-                                    label: 'CATEGORY',
-                                    value: (hint ?? 'UNKNOWN').toUpperCase(),
-                                    isCategory: true,
-                                    isVertical: true,
-                                    labelStyle: textTheme.labelSmall?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                      color: mutedColor.withValues(alpha: 0.6),
-                                      letterSpacing: 4,
-                                    ),
-                                    valueStyle: textTheme.headlineMedium
-                                        ?.copyWith(
-                                          fontWeight: FontWeight.w900,
-                                          color: textColor,
-                                          letterSpacing: -1,
-                                        ),
-                                  ),
-                                ] else ...[
-                                  _InfoRow(
-                                    label: 'SECRET WORD',
-                                    value:
-                                        (isImposter && decoyWord != null
-                                                ? decoyWord!
-                                                : secretWord)
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Flexible(
+                                child: showingAsImposter
+                                    ? _InfoRow(
+                                        label: 'CATEGORY',
+                                        value: (hint ?? 'UNKNOWN')
                                             .toUpperCase(),
-                                    isVertical: true,
-                                    labelStyle: textTheme.labelSmall?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                      color: mutedColor.withValues(alpha: 0.6),
-                                      letterSpacing: 4,
-                                    ),
-                                    valueStyle: textTheme.headlineMedium
-                                        ?.copyWith(
-                                          fontWeight: FontWeight.w900,
-                                          color: textColor,
-                                          letterSpacing: -1,
-                                        ),
-                                  ),
-                                ],
-                              ],
-                            ),
+                                        isCategory: true,
+                                        isVertical: true,
+                                        labelStyle: textTheme.labelSmall
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.bold,
+                                              color: mutedColor.withValues(
+                                                alpha: 0.6,
+                                              ),
+                                              letterSpacing: 4,
+                                            ),
+                                        valueStyle: textTheme.headlineMedium
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w900,
+                                              color: textColor,
+                                              letterSpacing: -1,
+                                            ),
+                                      )
+                                    : _InfoRow(
+                                        label: 'SECRET WORD',
+                                        value:
+                                            (isImposter && decoyWord != null
+                                                    ? decoyWord!
+                                                    : secretWord)
+                                                .toUpperCase(),
+                                        isVertical: true,
+                                        labelStyle: textTheme.labelSmall
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.bold,
+                                              color: mutedColor.withValues(
+                                                alpha: 0.6,
+                                              ),
+                                              letterSpacing: 4,
+                                            ),
+                                        valueStyle: textTheme.headlineMedium
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w900,
+                                              color: textColor,
+                                              letterSpacing: -1,
+                                            ),
+                                      ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -1370,7 +1377,7 @@ class _InfoRow extends StatelessWidget {
               value,
               style: effectiveValueStyle,
               maxLines: 2,
-              minFontSize: 10,
+              minFontSize: 6,
               overflow: TextOverflow.ellipsis,
               textAlign: isVertical ? TextAlign.center : TextAlign.end,
             ),
@@ -1382,9 +1389,10 @@ class _InfoRow extends StatelessWidget {
         value,
         style: effectiveValueStyle,
         maxLines: 2,
-        minFontSize: 10,
+        minFontSize: 6,
         overflow: TextOverflow.ellipsis,
         textAlign: isVertical ? TextAlign.center : TextAlign.end,
+        
       );
     }
 
@@ -1392,8 +1400,15 @@ class _InfoRow extends StatelessWidget {
       return Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(label, style: effectiveLabelStyle, textAlign: TextAlign.center),
-          const SizedBox(height: 8),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              label,
+              style: effectiveLabelStyle,
+              textAlign: TextAlign.center,
+            ),
+          ),
+          const SizedBox(height: 4),
           Flexible(child: content),
         ],
       );
@@ -1401,7 +1416,10 @@ class _InfoRow extends StatelessWidget {
 
     return Row(
       children: [
-        Text(label, style: effectiveLabelStyle),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(label, style: effectiveLabelStyle),
+        ),
         const SizedBox(width: 16),
         Expanded(child: content),
       ],

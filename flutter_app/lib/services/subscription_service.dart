@@ -22,13 +22,17 @@ class SubscriptionService extends ChangeNotifier {
   Future<void> init() async {
     String apiKey;
     if (Platform.isIOS) {
-      apiKey = 'test_eznKKnrUwxKWPRoNFFMyZBlWAPK';
+      // Use test key in debug mode, production key in release
+      apiKey = kDebugMode
+          ? 'test_eznKKnrUwxKWPRoNFFMyZBlWAPK'
+          : 'appl_YOUR_PRODUCTION_KEY_HERE'; // TODO: Replace with production key
     } else {
       throw UnsupportedError('Platform not supported');
-    }
+    }         
 
     await Purchases.configure(PurchasesConfiguration(apiKey));
     _isInitialized = true;
+    await checkEntitlement();
   }
 
   Future<void> checkEntitlement() async {
@@ -43,7 +47,7 @@ class SubscriptionService extends ChangeNotifier {
     }
   }
 
-  Future<bool> purchasePremium() async {
+  Future<bool> purchasePremium({required PackageType packageType}) async {
     if (!_isInitialized) {
       debugPrint("SubscriptionService not initialized");
       throw Exception("Service not initialized");
@@ -58,7 +62,11 @@ class SubscriptionService extends ChangeNotifier {
 
       if (offerings.current != null &&
           offerings.current!.availablePackages.isNotEmpty) {
-        final package = offerings.current!.availablePackages.first;
+        final packages = offerings.current!.availablePackages;
+        final package = packages.firstWhere(
+          (candidate) => candidate.packageType == packageType,
+          orElse: () => packages.first,
+        );
         debugPrint("Purchasing package: ${package.identifier}");
 
         final PurchaseResult result = await Purchases.purchasePackage(package);

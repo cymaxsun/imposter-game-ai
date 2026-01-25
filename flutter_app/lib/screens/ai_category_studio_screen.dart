@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/subscription_service.dart';
@@ -16,6 +18,25 @@ class AiCategoryStudioScreen extends StatefulWidget {
 
   @override
   State<AiCategoryStudioScreen> createState() => _AiCategoryStudioScreenState();
+}
+
+/// Result returned from the AI studio when saving a category.
+class AiCategoryResult {
+  /// Creates a result for a new AI-generated category.
+  const AiCategoryResult({
+    required this.name,
+    required this.words,
+    required this.selectAfterSave,
+  });
+
+  /// The category name.
+  final String name;
+
+  /// The generated words for the category.
+  final List<String> words;
+
+  /// Whether the category should be selected after saving.
+  final bool selectAfterSave;
 }
 
 class _AiCategoryStudioScreenState extends State<AiCategoryStudioScreen> {
@@ -50,6 +71,17 @@ class _AiCategoryStudioScreenState extends State<AiCategoryStudioScreen> {
   bool _isLoading = false;
   String _errorMessage = '';
 
+  Timer? _loadingTimer;
+  int _loadingMessageIndex = 0;
+
+  final List<String> _loadingMessages = [
+    'Connecting to AI...',
+    'Analyzing topic...',
+    'Brainstorming words...',
+    'Filtering for Imposters...',
+    'Finalizing list...',
+  ];
+
   final TextEditingController _topicController = TextEditingController();
 
   // Tips to show in the Creator Tip section
@@ -72,6 +104,7 @@ class _AiCategoryStudioScreenState extends State<AiCategoryStudioScreen> {
 
   @override
   void dispose() {
+    _loadingTimer?.cancel();
     _topicController.dispose();
     super.dispose();
   }
@@ -84,7 +117,29 @@ class _AiCategoryStudioScreenState extends State<AiCategoryStudioScreen> {
     });
   }
 
-  void _addCategory(String name, List<String> words) {
+  void _startLoadingTimer() {
+    _loadingMessageIndex = 0;
+    _loadingTimer?.cancel();
+    _loadingTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
+      if (mounted) {
+        setState(() {
+          _loadingMessageIndex =
+              (_loadingMessageIndex + 1) % _loadingMessages.length;
+        });
+      }
+    });
+  }
+
+  void _stopLoadingTimer() {
+    _loadingTimer?.cancel();
+    _loadingTimer = null;
+  }
+
+  void _addCategory(
+    String name,
+    List<String> words, {
+    required bool selectAfterSave,
+  }) {
     if (!UsageService().canSaveCategory && !SubscriptionService().isPremium) {
       // Fixed: added isPremium check
       _showLimitDialog(
@@ -94,18 +149,69 @@ class _AiCategoryStudioScreenState extends State<AiCategoryStudioScreen> {
       return;
     }
 
-    // Check for duplicate name
     if (widget.existingCategoryNames.contains(name)) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Category "$name" already exists.')),
-        );
-      }
-      return;
+      name = _uniqueCategoryName(name);
     }
 
     // Return the new category
-    Navigator.of(context).pop(MapEntry(name, words));
+    Navigator.of(context).pop(
+      AiCategoryResult(
+        name: name,
+        words: words,
+        selectAfterSave: selectAfterSave,
+      ),
+    );
+  }
+
+  String _uniqueCategoryName(String baseName) {
+    var candidate = baseName;
+    var suffix = 2;
+    while (widget.existingCategoryNames.contains(candidate)) {
+      candidate = '$baseName ($suffix)';
+      suffix++;
+    }
+    return candidate;
+  }
+
+  Future<void> _showAiResultScreen({
+    required String topic,
+    required List<String> words,
+    String? errorMessage,
+  }) async {
+    final displayTopic = widget.existingCategoryNames.contains(topic)
+        ? _uniqueCategoryName(topic)
+        : topic;
+    final action = await Navigator.of(context).push<_AiResultAction>(
+      MaterialPageRoute(
+        builder: (_) => _AiGenerationResultScreen(
+          topic: displayTopic,
+          words: words,
+          errorMessage: errorMessage,
+        ),
+      ),
+    );
+
+    if (action == null) return;
+
+    switch (action) {
+      case _AiResultAction.discard:
+        setState(() => _topicController.clear());
+        break;
+      case _AiResultAction.save:
+        _addCategory(displayTopic, words, selectAfterSave: false);
+        setState(() => _topicController.clear());
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Category "$displayTopic" saved!')),
+        );
+        break;
+      case _AiResultAction.useTheme:
+        _addCategory(displayTopic, words, selectAfterSave: true);
+        setState(() => _topicController.clear());
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Theme "$displayTopic" ready!')));
+        break;
+    }
   }
 
   Future<void> _generateAiList({bool isRegeneration = false}) async {
@@ -115,56 +221,85 @@ class _AiCategoryStudioScreenState extends State<AiCategoryStudioScreen> {
       return;
     }
 
+    if (!UsageService().canMakeRequest && !SubscriptionService().isPremium) {
+      if (mounted) {
+        Navigator.of(
+          context,
+        ).push(MaterialPageRoute(builder: (context) => const PaywallScreen()));
+      }
+      return;
+    }
+
     setState(() {
       _isLoading = true;
       _errorMessage = '';
+      _startLoadingTimer();
     });
 
     try {
-      final words = await ApiService.generateWordList(topic);
-      if (mounted) {
-        if (words.isNotEmpty) {
-          // Show generated words in a bottom sheet
-          _showGeneratedWordsSheet(topic, words);
-        } else {
-          setState(
-            () => _errorMessage = 'Could not generate a list for that topic.',
-          );
-        }
+      // START MOCK DATA CHANGE
+      // Only use mock data in debug mode
+      final bool useMockData = kDebugMode;
+
+      List<String> words;
+      if (useMockData) {
+        await Future.delayed(
+          const Duration(seconds: 2),
+        ); // Simulate network delay
+        words = [
+          'Astronaut',
+          'Rocket',
+          'Moon',
+          'Star',
+          'Comet',
+          'Galaxy',
+          'Telescope',
+          'Satellite',
+          'Meteor',
+          'Planet',
+          'Nebula',
+          'Black Hole',
+          'Space Station',
+          'Alien',
+          'UFO',
+        ];
+      } else {
+        words = await ApiService.generateWordList(topic);
+      }
+      // END MOCK DATA CHANGE
+
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _stopLoadingTimer();
+      });
+      if (words.isNotEmpty) {
+        // Increment usage count only on success
+        await UsageService().incrementRequestCount();
+        await _showAiResultScreen(topic: topic, words: words);
+      } else {
+        await _showAiResultScreen(
+          topic: topic,
+          words: const [],
+          errorMessage: 'Could not generate a list for that topic.',
+        );
       }
     } catch (e) {
-      if (mounted) setState(() => _errorMessage = 'Error: Check connection.');
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  void _showGeneratedWordsSheet(String topic, List<String> words) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => _GeneratedWordsSheet(
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _stopLoadingTimer();
+      });
+      await _showAiResultScreen(
         topic: topic,
-        words: words,
-        onDiscard: () {
-          Navigator.pop(context);
-          setState(() => _topicController.clear());
-        },
-        onRetry: () {
-          Navigator.pop(context);
-          _generateAiList(isRegeneration: true);
-        },
-        onSave: () {
-          _addCategory(topic, words);
-          Navigator.pop(context);
-          setState(() => _topicController.clear());
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('Category "$topic" saved!')));
-        },
-      ),
-    );
+        words: const [],
+        errorMessage: 'Error: Check connection.',
+      );
+    } finally {
+      if (!mounted) {
+        _stopLoadingTimer();
+      }
+    }
   }
 
   @override
@@ -205,6 +340,21 @@ class _AiCategoryStudioScreenState extends State<AiCategoryStudioScreen> {
               ],
             ),
           ),
+          actions: [
+            // Debug-only button to reset daily limit
+            if (kDebugMode)
+              IconButton(
+                icon: const Icon(Icons.refresh, color: Colors.grey),
+                tooltip: 'Reset Daily Limit (Debug)',
+                onPressed: () {
+                  UsageService().resetDailyLimit();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Daily limit reset!')),
+                  );
+                },
+              ),
+            const SizedBox(width: 8),
+          ],
         ),
         body: SafeArea(
           child: SingleChildScrollView(
@@ -217,7 +367,7 @@ class _AiCategoryStudioScreenState extends State<AiCategoryStudioScreen> {
                 // Animated Hero Header
 
                 // Simple Hero Header
-                const Column(
+                Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
@@ -233,6 +383,44 @@ class _AiCategoryStudioScreenState extends State<AiCategoryStudioScreen> {
                     Text(
                       'Describe a topic or theme to create a category.',
                       style: TextStyle(fontSize: 14, color: Color(0xFF718096)),
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF6B5CE7).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: const Color(0xFF6B5CE7).withValues(alpha: 0.2),
+                        ),
+                      ),
+                      child: ListenableBuilder(
+                        listenable: UsageService(),
+                        builder: (context, child) {
+                          return Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.bolt,
+                                size: 14,
+                                color: Color(0xFF6B5CE7),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Daily Usage: ${UsageService().dailyRequestCount} / ${UsageService().maxDailyRequests}',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF6B5CE7),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
                     ),
                   ],
                 ),
@@ -256,6 +444,8 @@ class _AiCategoryStudioScreenState extends State<AiCategoryStudioScreen> {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       TextField(
+                        textCapitalization: TextCapitalization.sentences,
+                        textInputAction: TextInputAction.done,
                         controller: _topicController,
                         maxLines: 3,
                         style: const TextStyle(
@@ -338,13 +528,31 @@ class _AiCategoryStudioScreenState extends State<AiCategoryStudioScreen> {
                         ),
                       ),
                       child: _isLoading
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
+                          ? Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 300),
+                                  child: Text(
+                                    _loadingMessages[_loadingMessageIndex],
+                                    key: ValueKey<int>(_loadingMessageIndex),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             )
                           : const Row(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -467,156 +675,558 @@ class _AiCategoryStudioScreenState extends State<AiCategoryStudioScreen> {
   }
 }
 
-/// Bottom sheet for viewing generated words
-class _GeneratedWordsSheet extends StatelessWidget {
+enum _AiResultAction { discard, save, useTheme }
+
+class _AiGenerationResultScreen extends StatefulWidget {
   final String topic;
   final List<String> words;
-  final VoidCallback onDiscard;
-  final VoidCallback onRetry;
-  final VoidCallback onSave;
+  final String? errorMessage;
 
-  const _GeneratedWordsSheet({
+  const _AiGenerationResultScreen({
     required this.topic,
     required this.words,
-    required this.onDiscard,
-    required this.onRetry,
-    required this.onSave,
+    this.errorMessage,
   });
 
   @override
-  Widget build(BuildContext context) {
-    // Determine category count from passed list for usage check display if needed
-    // But mainly we rely on checking limit in _addCategory
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              const Icon(
-                Icons.check_circle,
-                color: Color(0xFF4CAF50),
-                size: 24,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'Generated: $topic',
-                    style: const TextStyle(
-                      color: Color(0xFF6B5CE7),
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                    ),
-                  ),
-                ),
-              ),
-              IconButton(
-                onPressed: onDiscard,
-                icon: const Icon(Icons.close, size: 24),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: words.map((word) {
-              return Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF5F5F5),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
-                ),
-                child: Text(
-                  word,
-                  style: const TextStyle(
-                    color: Color(0xFF2D3748),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-          const SizedBox(height: 24),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: onDiscard,
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    side: BorderSide(color: Colors.grey[300]!),
-                    foregroundColor: Colors.grey[700],
-                  ),
-                  child: const Text('Discard'),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: onRetry,
-                  icon: const Icon(Icons.refresh, size: 18),
-                  label: const Text('Retry'),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    side: const BorderSide(color: Color(0xFF6B5CE7)),
-                    foregroundColor: const Color(0xFF6B5CE7),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Container(
+  State<_AiGenerationResultScreen> createState() =>
+      _AiGenerationResultScreenState();
+}
+
+class _AiGenerationResultScreenState extends State<_AiGenerationResultScreen> {
+  static const _warmWhite = Color(0xFFFDFCFB);
+  static const _mintAccent = Color(0xFF10B981);
+  static const _charcoal = Color(0xFF334155);
+  static const _textSecondary = Color(0xFF64748B);
+  static const _lavenderAccent = Color(0xFFA78BFA);
+  static const _aiPurple = Color(0xFF6B5CE7);
+  static const double _actionFadeHeight = 40;
+  static const double _actionBarHeight = 52;
+  static const double _actionBarPadding = 16;
+
+  bool _isExpanded = false;
+  bool _hasOverflow = false;
+  double? _infoHeight;
+  double? _wordsHeight;
+
+  Widget _buildWordChips() {
+    return _MeasureSize(
+      onChange: (size) {
+        if (_wordsHeight != size.height) {
+          setState(() => _wordsHeight = size.height);
+        }
+      },
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: widget.words.map((word) {
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF8B7CF6), Color(0xFF6B5CE7)],
-              ),
-              borderRadius: BorderRadius.circular(16),
+              color: _warmWhite,
+              borderRadius: BorderRadius.circular(20),
             ),
-            child: ElevatedButton(
-              onPressed: onSave,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.transparent,
-                shadowColor: Colors.transparent,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
+            child: Text(
+              word,
+              style: const TextStyle(
+                color: _charcoal,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
               ),
-              child: const Text(
-                'Save to Library',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow() {
+    return _MeasureSize(
+      onChange: (size) {
+        if (_infoHeight != size.height) {
+          setState(() => _infoHeight = size.height);
+        }
+      },
+      child: Row(
+        children: [
+          const Icon(Icons.info, color: _lavenderAccent),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text(
+              'You can edit the word list after adding it to your library.',
+              style: TextStyle(
+                fontSize: 12,
+                color: _textSecondary,
+                height: 1.4,
               ),
             ),
           ),
-          SizedBox(height: MediaQuery.of(context).viewPadding.bottom),
         ],
       ),
     );
+  }
+
+  void _scheduleOverflowUpdate(bool value) {
+    if (_hasOverflow == value) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      setState(() => _hasOverflow = value);
+    });
+  }
+
+  Widget _buildCard({
+    required bool constrained,
+    required Color cardBackground,
+    required bool hasError,
+  }) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+      decoration: BoxDecoration(
+        color: cardBackground,
+        borderRadius: BorderRadius.circular(32),
+      ),
+      child: Column(
+        children: [
+          Text(
+            widget.topic.isEmpty ? 'AI Theme' : widget.topic,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.w600,
+              color: Colors.black,
+              letterSpacing: -0.5,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: const [
+                Icon(Icons.auto_awesome, size: 14, color: _lavenderAccent),
+                SizedBox(width: 6),
+                Text(
+                  'THEME WORDS',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: _lavenderAccent,
+                    letterSpacing: 0.6,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (hasError)
+            Text(
+              widget.errorMessage!,
+              style: const TextStyle(
+                color: _warmWhite,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            )
+          else if (constrained)
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final availableHeight = constraints.maxHeight;
+                  // Assume overflow until measured, then use actual height
+                  final hasOverflow =
+                      (_wordsHeight ?? double.infinity) > availableHeight + 1;
+                  _scheduleOverflowUpdate(hasOverflow);
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(
+                        child: Stack(
+                          children: [
+                            Positioned.fill(
+                              child: ClipRect(
+                                child: SingleChildScrollView(
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  child: _buildWordChips(),
+                                ),
+                              ),
+                            ),
+                            if (hasOverflow)
+                              Positioned(
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                child: IgnorePointer(
+                                  child: Container(
+                                    height: 72,
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topCenter,
+                                        end: Alignment.bottomCenter,
+                                        colors: [
+                                          cardBackground.withValues(alpha: 0),
+                                          cardBackground,
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      if (hasOverflow)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 12),
+                          child: TextButton.icon(
+                            onPressed: () {
+                              setState(() {
+                                _isExpanded = true;
+                              });
+                            },
+                            style: TextButton.styleFrom(
+                              foregroundColor: _aiPurple,
+                              minimumSize: const Size.fromHeight(44),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(18),
+                              ),
+                            ),
+                            icon: const Icon(Icons.expand_more, size: 20),
+                            label: const Text(
+                              'See more',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  );
+                },
+              ),
+            )
+          else
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildWordChips(),
+                if (_hasOverflow)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: TextButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          _isExpanded = false;
+                        });
+                      },
+                      style: TextButton.styleFrom(
+                        foregroundColor: _aiPurple,
+                        minimumSize: const Size.fromHeight(44),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                      ),
+                      icon: const Icon(Icons.expand_less, size: 20),
+                      label: const Text(
+                        'Show less',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildResultContent({
+    required bool hasError,
+    required Color cardBackground,
+    required double bottomPadding,
+  }) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const double horizontalPadding = 24;
+        const double topPadding = 8;
+        const double cardPadding = 48; // 24 top + 24 bottom in card
+        const double titleHeight = 60; // Approximate title + label height
+        const double spacing = 20; // Gap between card and info row
+
+        // Calculate if content would fit naturally
+        final availableHeight =
+            constraints.maxHeight - bottomPadding - topPadding;
+        final estimatedCardContentHeight =
+            cardPadding +
+            titleHeight +
+            (_wordsHeight ?? double.infinity) +
+            spacing +
+            (_infoHeight ?? 40);
+
+        final contentFits = estimatedCardContentHeight <= availableHeight;
+
+        // When expanded, always use scrollable natural layout
+        if (_isExpanded) {
+          return SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(
+              horizontalPadding,
+              topPadding,
+              horizontalPadding,
+              bottomPadding,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildCard(
+                  constrained: false,
+                  cardBackground: cardBackground,
+                  hasError: hasError,
+                ),
+                const SizedBox(height: 20),
+                _buildInfoRow(),
+              ],
+            ),
+          );
+        }
+
+        // When collapsed: use natural sizing if it fits, constrained if not
+        if (contentFits && _wordsHeight != null) {
+          // Content fits - use natural sizing (card shrinks to content)
+          return Padding(
+            padding: EdgeInsets.fromLTRB(
+              horizontalPadding,
+              topPadding,
+              horizontalPadding,
+              bottomPadding,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildCard(
+                  constrained: false,
+                  cardBackground: cardBackground,
+                  hasError: hasError,
+                ),
+                const SizedBox(height: 20),
+                _buildInfoRow(),
+              ],
+            ),
+          );
+        }
+
+        // Content overflows or not yet measured - use constrained layout
+        return Padding(
+          padding: EdgeInsets.fromLTRB(
+            horizontalPadding,
+            topPadding,
+            horizontalPadding,
+            bottomPadding,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Flexible(
+                child: _buildCard(
+                  constrained: true,
+                  cardBackground: cardBackground,
+                  hasError: hasError,
+                ),
+              ),
+              const SizedBox(height: 20),
+              _buildInfoRow(),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildActionBar({required bool hasError}) {
+    return SizedBox(
+      width: double.infinity,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      _warmWhite.withValues(alpha: 0),
+                      _warmWhite.withValues(alpha: 0.8),
+                      _warmWhite,
+                    ],
+                    stops: const [0.0, 0.55, 1.0],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(_actionBarPadding),
+            child: SafeArea(
+              top: false,
+              child: SizedBox(
+                width: double.infinity,
+                height: _actionBarHeight,
+                child: Row(
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: ElevatedButton.icon(
+                        onPressed: hasError
+                            ? null
+                            : () => Navigator.of(
+                                context,
+                              ).pop(_AiResultAction.save),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          minimumSize: const Size.fromHeight(_actionBarHeight),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                          backgroundColor: _mintAccent,
+                          foregroundColor: Colors.white,
+                          elevation: 6,
+                          shadowColor: _mintAccent.withValues(alpha: 0.35),
+                        ),
+                        icon: const Icon(Icons.bookmark_add_rounded, size: 18),
+                        label: const Text(
+                          'Save to Library',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    SizedBox(
+                      width: _actionBarHeight,
+                      height: _actionBarHeight,
+                      child: ElevatedButton(
+                        onPressed: () =>
+                            Navigator.of(context).pop(_AiResultAction.discard),
+                        style: ElevatedButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          alignment: Alignment.center,
+                          minimumSize: const Size.fromHeight(_actionBarHeight),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                          backgroundColor: Colors.red.shade600,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                        ),
+                        child: const Icon(Icons.delete_rounded, size: 20),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasError =
+        widget.errorMessage != null && widget.errorMessage!.isNotEmpty;
+
+    final cardBackground = Color.alphaBlend(
+      _lavenderAccent.withValues(alpha: 0.2),
+      _warmWhite,
+    );
+
+    final bottomInset = MediaQuery.of(context).padding.bottom;
+    final contentBottomPadding =
+        _actionBarHeight + _actionBarPadding + bottomInset + 16;
+
+    return Scaffold(
+      backgroundColor: _warmWhite,
+      appBar: AppBar(
+        centerTitle: true,
+        backgroundColor: _warmWhite.withValues(alpha: 0.9),
+        scrolledUnderElevation: 0,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.chevron_left, size: 28),
+          onPressed: () => Navigator.of(context).pop(_AiResultAction.discard),
+        ),
+      ),
+      body: SafeArea(
+        bottom: false,
+        child: _isExpanded
+            ? Stack(
+                children: [
+                  Positioned.fill(
+                    child: _buildResultContent(
+                      hasError: hasError,
+                      cardBackground: cardBackground,
+                      bottomPadding: contentBottomPadding,
+                    ),
+                  ),
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: _buildActionBar(hasError: hasError),
+                  ),
+                ],
+              )
+            : Column(
+                children: [
+                  Expanded(
+                    child: _buildResultContent(
+                      hasError: hasError,
+                      cardBackground: cardBackground,
+                      bottomPadding: 8,
+                    ),
+                  ),
+                  _buildActionBar(hasError: hasError),
+                ],
+              ),
+      ),
+    );
+  }
+}
+
+class _MeasureSize extends StatefulWidget {
+  const _MeasureSize({required this.onChange, required this.child});
+
+  final ValueChanged<Size> onChange;
+  final Widget child;
+
+  @override
+  State<_MeasureSize> createState() => _MeasureSizeState();
+}
+
+class _MeasureSizeState extends State<_MeasureSize> {
+  Size? _oldSize;
+
+  @override
+  Widget build(BuildContext context) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final size = context.size;
+      if (size == null || _oldSize == size) return;
+      _oldSize = size;
+      widget.onChange(size);
+    });
+    return widget.child;
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../data/models/game_settings.dart';
 import '../data/repositories/word_repository.dart';
+import '../services/usage_service.dart';
 
 /// ViewModel for the [SetupScreen].
 ///
@@ -24,6 +25,14 @@ class SetupViewModel extends ChangeNotifier {
     : _wordRepository = wordRepository ?? WordRepository(),
       _settings = GameSettings.initial() {
     _initializeControllers();
+  }
+
+  /// Loads persisted categories and updates usage counts.
+  Future<void> init() async {
+    await _wordRepository.init();
+    _normalizeSelectedCategories();
+    _syncSavedCategoryCount();
+    notifyListeners();
   }
 
   void _initializeControllers() {
@@ -92,6 +101,15 @@ class SetupViewModel extends ChangeNotifier {
       _settings = _settings.copyWith(selectedCategories: newSelection);
       notifyListeners();
     }
+  }
+
+  /// Ensures the given category is selected.
+  void selectCategory(String category) {
+    if (_settings.selectedCategories.contains(category)) return;
+    final newSelection = Set<String>.from(_settings.selectedCategories)
+      ..add(category);
+    _settings = _settings.copyWith(selectedCategories: newSelection);
+    notifyListeners();
   }
 
   /// Toggles a category selection.
@@ -166,12 +184,14 @@ class SetupViewModel extends ChangeNotifier {
   /// Adds a new category to the repository.
   void addCategory(String name, List<String> words) {
     _wordRepository.addCategory(name, words);
+    _syncSavedCategoryCount();
     notifyListeners();
   }
 
   /// Deletes a category from the repository.
   void deleteCategory(String category) {
     _wordRepository.deleteCategory(category);
+    _syncSavedCategoryCount();
     // If deleted category was selected, remove it
     if (_settings.selectedCategories.contains(category)) {
       final newSelected = Set<String>.from(_settings.selectedCategories)
@@ -192,7 +212,26 @@ class SetupViewModel extends ChangeNotifier {
   /// Updates the repository with new categories.
   void updateCategories(Map<String, List<String>> newCategories) {
     _wordRepository.updateCategories(newCategories);
+    _syncSavedCategoryCount();
     notifyListeners();
+  }
+
+  void _syncSavedCategoryCount() {
+    UsageService().updateSavedCategoryCount(_wordRepository.categories.length);
+  }
+
+  void _normalizeSelectedCategories() {
+    final available = _wordRepository.categories.toSet();
+    final selected = _settings.selectedCategories
+        .where(available.contains)
+        .toSet();
+    if (selected.isEmpty && available.isNotEmpty) {
+      selected.add(available.first);
+    }
+    if (selected.isNotEmpty &&
+        selected.length != _settings.selectedCategories.length) {
+      _settings = _settings.copyWith(selectedCategories: selected);
+    }
   }
 
   @override

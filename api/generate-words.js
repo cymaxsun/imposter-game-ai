@@ -18,13 +18,13 @@ async function generateWords(topic, modelIndex = 0) {
     const model = MODELS[modelIndex];
     console.log(`Trying model: ${model}`);
 
-    const prompt = `You are an assistant for an imposter-style party game. Your task is to generate a list of 10 specific, named examples for a given topic. Avoid general terms, categories, or related concepts.
+    const prompt = `You are an assistant for an imposter-style party game. Your task is to generate a list of 100 specific, named examples for a given topic. Avoid general terms, categories, or related concepts.
 
 For example:
-- If the topic is "Marvel Superheroes", a good list is: ["Iron Man", "Captain America", "Thor", "Hulk", "Spider-Man"].
-- A bad list for "Marvel Superheroes" would be: ["Superhero", "Villain", "Avenger", "Sidekick", "Costume"].
+- If the topic is "Marvel Superheroes", good examples include: ["Iron Man", "Captain America", "Thor", "Hulk", "Spider-Man", "Black Widow", "Hawkeye", "Scarlet Witch", ...].
+- Bad examples for "Marvel Superheroes" would be: ["Superhero", "Villain", "Avenger", "Sidekick", "Costume"].
 
-Now, generate a list of 10 specific, named examples for the topic: '${topic}'.`;
+Now, generate a list of 100 specific, named examples for the topic: '${topic}'.`;
 
     try {
         let result;

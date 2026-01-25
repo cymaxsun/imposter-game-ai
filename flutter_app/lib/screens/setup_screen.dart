@@ -1,6 +1,8 @@
+import 'dart:async';
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'dart:math';
 
 import 'game_screen.dart';
 import '../theme/app_theme.dart';
@@ -8,7 +10,8 @@ import 'ai_category_studio_screen.dart';
 import '../viewmodels/setup_view_model.dart';
 import 'category_gallery_screen.dart';
 import 'edit_category_screen.dart';
-import 'components/category_deck_sheet.dart';
+import 'paywall_screen.dart';
+import '../services/subscription_service.dart';
 
 /// Stitch-inspired setup screen with pastel colors and friendly layout.
 ///
@@ -27,6 +30,7 @@ class _SetupScreenState extends State<SetupScreen> {
   void initState() {
     super.initState();
     _viewModel = SetupViewModel();
+    unawaited(_viewModel.init());
   }
 
   @override
@@ -36,7 +40,7 @@ class _SetupScreenState extends State<SetupScreen> {
   }
 
   Future<void> _navigateToManageCategories() async {
-    final result = await Navigator.push<MapEntry<String, List<String>>>(
+    final result = await Navigator.push<AiCategoryResult>(
       context,
       MaterialPageRoute(
         builder: (context) => AiCategoryStudioScreen(
@@ -46,7 +50,10 @@ class _SetupScreenState extends State<SetupScreen> {
     );
     // If AiCategoryStudioScreen returns a new category, add it
     if (result != null) {
-      _viewModel.addCategory(result.key, result.value);
+      _viewModel.addCategory(result.name, result.words);
+      if (result.selectAfterSave) {
+        _viewModel.selectCategory(result.name);
+      }
     }
   }
 
@@ -86,6 +93,7 @@ class _SetupScreenState extends State<SetupScreen> {
     return ListenableBuilder(
       listenable: _viewModel,
       builder: (context, child) {
+        final isKeyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
         return GestureDetector(
           onTap: () => FocusScope.of(context).unfocus(),
           child: Scaffold(
@@ -135,11 +143,12 @@ class _SetupScreenState extends State<SetupScreen> {
                     ),
                   ],
                 ),
-                _StartButton(
-                  onTap: _viewModel.activeWordList.isNotEmpty
-                      ? _startGame
-                      : null,
-                ),
+                if (!isKeyboardOpen)
+                  _StartButton(
+                    onTap: _viewModel.activeWordList.isNotEmpty
+                        ? _startGame
+                        : null,
+                  ),
               ],
             ),
           ),
@@ -170,8 +179,8 @@ class _SetupScreenState extends State<SetupScreen> {
     );
   }
 
-  void _navigateToCategoryGallery(BuildContext context) {
-    Navigator.of(context).push(
+  Future<void> _navigateToCategoryGallery(BuildContext context) async {
+    final result = await Navigator.of(context).push<AiCategoryResult>(
       MaterialPageRoute(
         builder: (context) => ListenableBuilder(
           listenable: _viewModel,
@@ -193,6 +202,11 @@ class _SetupScreenState extends State<SetupScreen> {
         ),
       ),
     );
+    if (result == null) return;
+    _viewModel.addCategory(result.name, result.words);
+    if (result.selectAfterSave) {
+      _viewModel.selectCategory(result.name);
+    }
   }
 }
 
@@ -205,8 +219,29 @@ class _StickyHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return SliverAppBar(
       pinned: true,
+      toolbarHeight: 56,
       backgroundColor: Colors.white.withValues(alpha: 0.7),
       elevation: 0,
+      leading: Padding(
+        padding: const EdgeInsets.only(left: 8),
+        child: Center(
+          child: GestureDetector(
+            onTap: () => _showHowToPlayDialog(context),
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                Icons.help_outline,
+                size: 20,
+                color: Colors.grey.shade600,
+              ),
+            ),
+          ),
+        ),
+      ),
       flexibleSpace: ClipRect(
         child: Container(
           decoration: BoxDecoration(
@@ -216,14 +251,188 @@ class _StickyHeader extends StatelessWidget {
           ),
         ),
       ),
-      title: Text(
-        'Imposter Finder',
-        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-          fontWeight: FontWeight.bold,
-          color: textMain,
+      title: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(
+          'Imposter Finder',
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: textMain,
+          ),
         ),
       ),
+      titleSpacing: 0,
       centerTitle: true,
+      actions: [
+        Padding(
+          padding: const EdgeInsets.only(right: 12),
+          child: _SubscriptionBadge(),
+        ),
+      ],
+    );
+  }
+
+  static void _showHowToPlayDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Icon(Icons.help_outline, color: Theme.of(ctx).colorScheme.primary),
+            const SizedBox(width: 8),
+            const Text('How to Play'),
+          ],
+        ),
+        content: const SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _HowToPlayStep(
+                number: '1',
+                title: 'Setup',
+                description: 'Add players and choose a category.',
+              ),
+              SizedBox(height: 12),
+              _HowToPlayStep(
+                number: '2',
+                title: 'Pass the Phone',
+                description:
+                    'Each player secretly views their word. Imposters get a different word (or no word).',
+              ),
+              SizedBox(height: 12),
+              _HowToPlayStep(
+                number: '3',
+                title: 'Discuss',
+                description:
+                    'Take turns describing your word without saying it directly.',
+              ),
+              SizedBox(height: 12),
+              _HowToPlayStep(
+                number: '4',
+                title: 'Vote',
+                description: 'Vote to eliminate who you think is the Imposter!',
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Got it!'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HowToPlayStep extends StatelessWidget {
+  final String number;
+  final String title;
+  final String description;
+
+  const _HowToPlayStep({
+    required this.number,
+    required this.title,
+    required this.description,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Center(
+            child: Text(
+              number,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 2),
+              Text(
+                description,
+                style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SubscriptionBadge extends StatelessWidget {
+  const _SubscriptionBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    // Import these at top of file if not already present
+    final isPremium = SubscriptionService().isPremium;
+
+    final backgroundColor = isPremium
+        ? const Color(0xFFFFF8E1) // Gold tint for Pro
+        : Colors.grey.shade100;
+    final textColor = isPremium
+        ? const Color(0xFFFF8F00) // Amber for Pro
+        : Colors.grey.shade600;
+    final icon = isPremium ? Icons.star : null;
+
+    return GestureDetector(
+      onTap: isPremium
+          ? null
+          : () {
+              Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const PaywallScreen()));
+            },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isPremium ? const Color(0xFFFFD54F) : Colors.grey.shade300,
+            width: 0.5,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 10, color: textColor),
+              const SizedBox(width: 2),
+            ],
+            Text(
+              isPremium ? 'PRO' : 'FREE',
+              style: TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.bold,
+                color: textColor,
+                letterSpacing: 0.3,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

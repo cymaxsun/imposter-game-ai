@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:developer' as developer;
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
@@ -49,11 +48,9 @@ class ApiService {
 
     if (!usage.canMakeRequest && !subscription.isPremium) {
       // In a real app we might throw a specific exception to show Paywall
+      print('Daily usage limit reached. Please upgrade to Premium.');
       throw Exception('Daily usage limit reached. Please upgrade to Premium.');
     }
-
-    // I will write the code to check limit and throw, and handle "Premium" bypass in the next step or assume UsageService *will* be updated.
-    // Actually, I will check SubscriptionService here too.
 
     return _authenticatedRequest<List<String>>(
       (token) async {
@@ -95,15 +92,12 @@ class ApiService {
       String token = await _getSessionToken();
 
       // 2. Make Request
-      developer.log('Making authenticated request...', name: 'api_service');
+      print('[api_service] Making authenticated request...');
       var response = await requestBuilder(token);
 
       // 3. Handle 401 (Auto-Renewal)
       if (response.statusCode == 401) {
-        developer.log(
-          'Token expired/invalid (401). Renewing session...',
-          name: 'api_service',
-        );
+        print('[api_service] Token expired/invalid (401). Renewing session...');
         await _clearSession();
         token = await _performSecureHandshake(); // Force new handshake
         response = await requestBuilder(token); // Retry
@@ -120,19 +114,10 @@ class ApiService {
 
       // 5. Handle Other Errors
       final body = response.body;
-      developer.log(
-        'Request failed: ${response.statusCode}',
-        error: body,
-        name: 'api_service',
-      );
+      print('[api_service] Request failed: ${response.statusCode} - $body');
       throw Exception('Request failed: ${response.statusCode} - $body');
     } catch (e, stack) {
-      developer.log(
-        'Error in authenticated request',
-        error: e,
-        stackTrace: stack,
-        name: 'api_service',
-      );
+      print('[api_service] Error in authenticated request: $e\n$stack');
       rethrow;
     }
   }
@@ -167,7 +152,7 @@ class ApiService {
   /// 3. Exchange Attestation for Session JWT.
   /// 4. Store JWT securely.
   static Future<String> _performSecureHandshake() async {
-    developer.log('Starting Secure Handshake...', name: 'api_service');
+    print('[api_service] Starting Secure Handshake...');
 
     if (!await AttestService.isSupported()) {
       throw Exception('Device integrity checks not supported on this device.');
@@ -210,10 +195,7 @@ class ApiService {
     await _storage.write(key: _sessionTokenKey, value: token);
     _currentSessionToken = token;
 
-    developer.log(
-      'Handshake successful. Session established.',
-      name: 'api_service',
-    );
+    print('[api_service] Handshake successful. Session established.');
     return token;
   }
 
@@ -226,7 +208,7 @@ class ApiService {
       }
       return null;
     } catch (e) {
-      developer.log('Error fetching challenge', name: 'api_service', error: e);
+      print('[api_service] Error fetching challenge: $e');
       return null;
     }
   }

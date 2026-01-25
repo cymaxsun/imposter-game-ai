@@ -9,6 +9,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Initialize services
+
   await UsageService().init();
   try {
     await SubscriptionService().init();
