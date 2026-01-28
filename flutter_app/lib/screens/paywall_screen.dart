@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import '../services/subscription_service.dart';
+import '../utils/ui_utils.dart';
+import '../theme/app_theme.dart';
 
 class PaywallScreen extends StatefulWidget {
   const PaywallScreen({super.key});
@@ -21,22 +23,17 @@ class _PaywallScreenState extends State<PaywallScreen> {
     try {
       await SubscriptionService().restorePurchases();
       if (SubscriptionService().isPremium && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Purchases restored successfully!')),
-        );
+        showIosSnackBar(context, 'Purchases restored successfully!');
         Navigator.of(context).pop();
       } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No active subscriptions found.')),
-        );
+        showIosSnackBar(context, 'No active subscriptions found.');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString().replaceAll('Exception:', '').trim()),
-            backgroundColor: Colors.red,
-          ),
+        showIosSnackBar(
+          context,
+          e.toString().replaceAll('Exception:', '').trim(),
+          isError: true,
         );
       }
     } finally {
@@ -51,21 +48,15 @@ class _PaywallScreenState extends State<PaywallScreen> {
         packageType: packageType,
       );
       if (success && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Welcome to Premium! Limits removed.'),
-            backgroundColor: Color(0xFF6B5CE7),
-          ),
-        );
+        showIosSnackBar(context, 'Welcome to Premium! Limits removed.');
         Navigator.of(context).pop();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString().replaceAll('Exception:', '').trim()),
-            backgroundColor: Colors.red,
-          ),
+        showIosSnackBar(
+          context,
+          e.toString().replaceAll('Exception:', '').trim(),
+          isError: true,
         );
       }
     } finally {
@@ -75,13 +66,16 @@ class _PaywallScreenState extends State<PaywallScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const deepCharcoal = Color(0xFF121118);
-    const warmOffWhite = Color(0xFFFDFCF8);
-    const softLavender = Color(0xFFE6E1FF);
-    const vibrantMint = Color(0xFFBBF7D0);
-    const primaryGreen = Color(0xFF4ADE80);
-    const golden = Color(0xFFFACC15);
-    const octoLavender = Color(0xFFB8A9FF);
+    final colorScheme = Theme.of(context).colorScheme;
+    final customColors = Theme.of(context).extension<CustomColors>()!;
+
+    final deepCharcoal = colorScheme.onSurface;
+    final warmOffWhite = colorScheme.surface;
+    final softLavender = colorScheme.primaryContainer;
+    final vibrantMint = colorScheme.secondaryContainer;
+    final primaryGreen = customColors.succeed!;
+    final golden = colorScheme.tertiaryContainer;
+    final octoLavender = colorScheme.secondary.withValues(alpha: 0.7);
     final textTheme = GoogleFonts.plusJakartaSansTextTheme(
       Theme.of(context).textTheme,
     ).apply(bodyColor: deepCharcoal, displayColor: deepCharcoal);
@@ -158,6 +152,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                                       )
                                     else ...[
                                       _buildPlanSelector(
+                                        context: context,
                                         deepCharcoal: deepCharcoal,
                                         softLavender: softLavender,
                                         vibrantMint: vibrantMint,
@@ -172,9 +167,8 @@ class _PaywallScreenState extends State<PaywallScreen> {
                                             ),
                                             boxShadow: [
                                               BoxShadow(
-                                                color: const Color(
-                                                  0xFF34D399,
-                                                ).withValues(alpha: 0.25),
+                                                color: customColors.succeed!
+                                                    .withValues(alpha: 0.25),
                                                 blurRadius: 16,
                                                 offset: const Offset(0, 4),
                                               ),
@@ -376,10 +370,13 @@ class _PaywallScreenState extends State<PaywallScreen> {
   }
 
   Widget _buildPlanSelector({
+    required BuildContext context,
     required Color deepCharcoal,
     required Color softLavender,
     required Color vibrantMint,
   }) {
+    final customColors = Theme.of(context).extension<CustomColors>()!;
+    final colorScheme = Theme.of(context).colorScheme;
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -401,8 +398,9 @@ class _PaywallScreenState extends State<PaywallScreen> {
           caption: '(Save 50%)',
           isSelected: _isYearlySelected,
           accentColor: vibrantMint,
-          highlightColor: const Color(0xFF22C55E),
-          badgeColor: const Color(0xFF10B981),
+          highlightColor: customColors.succeed!, // Was successGreen
+          badgeColor: colorScheme
+              .onSecondaryContainer, // Was emeraldText which maps to onSecondaryContainer
           deepCharcoal: deepCharcoal,
           showBadge: true,
           onTap: () => setState(() => _isYearlySelected = true),
@@ -507,9 +505,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                   borderColor: label == 'Yearly'
                       ? badgeColor.withValues(alpha: 0.6)
                       : deepCharcoal.withValues(alpha: 0.2),
-                  fillColor: label == 'Yearly'
-                      ? const Color(0xFF059669)
-                      : deepCharcoal,
+                  fillColor: label == 'Yearly' ? badgeColor : deepCharcoal,
                 ),
               ],
             ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../utils/ui_utils.dart';
 import '../theme/pastel_theme.dart';
 
 class EditCategoryScreen extends StatefulWidget {
@@ -65,11 +66,7 @@ class _EditCategoryScreenState extends State<EditCategoryScreen> {
       Navigator.of(context).pop();
     } else {
       // Show error?
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter a name and at least one word.'),
-        ),
-      );
+      showIosSnackBar(context, 'Please enter a name and at least one word.');
     }
   }
 
@@ -109,11 +106,10 @@ class _EditCategoryScreenState extends State<EditCategoryScreen> {
   @override
   Widget build(BuildContext context) {
     final pastelTheme = Theme.of(context).extension<PastelTheme>()!;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     // Mapping HTML colors to Flutter
-    final primaryColor = const Color(0xFF307DE8);
+    final primaryColor = Theme.of(context).colorScheme.primary;
     final scaffoldBg = Theme.of(context).scaffoldBackgroundColor;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       backgroundColor: scaffoldBg,
@@ -172,13 +168,13 @@ class _EditCategoryScreenState extends State<EditCategoryScreen> {
                                 fontWeight: FontWeight.bold,
                                 color: isDark
                                     ? Colors.white
-                                    : const Color(0xFF111418),
+                                    : Theme.of(context).colorScheme.onSurface,
                               ),
                               decoration: InputDecoration(
                                 hintText: 'Category Name',
                                 border: InputBorder.none,
                                 hintStyle: TextStyle(
-                                  color: Colors.grey.withOpacity(0.5),
+                                  color: Colors.grey.withValues(alpha: 0.5),
                                 ),
                               ),
                             ),
@@ -299,7 +295,7 @@ class _EditCategoryScreenState extends State<EditCategoryScreen> {
       ),
       color: Theme.of(
         context,
-      ).scaffoldBackgroundColor.withOpacity(0.8), // Placeholder for blur
+      ).scaffoldBackgroundColor.withValues(alpha: 0.8), // Placeholder for blur
       // Note: Real blur requires BackdropFilter + ClipRect, which is expensive, utilizing opacity for now as per previous patterns
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -323,7 +319,9 @@ class _EditCategoryScreenState extends State<EditCategoryScreen> {
             style: GoogleFonts.splineSans(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: isDark ? Colors.white : const Color(0xFF111418),
+              color: isDark
+                  ? Colors.white
+                  : Theme.of(context).colorScheme.onSurface, // Was 0xFF111418
             ),
           ),
           const SizedBox(width: 40), // Balance center
@@ -336,25 +334,30 @@ class _EditCategoryScreenState extends State<EditCategoryScreen> {
     final color = theme.pastelBlue;
 
     return Container(
+      constraints: BoxConstraints(
+        maxWidth: MediaQuery.of(context).size.width - 40,
+      ),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color:
-            color, // .withOpacity(0.6)? The HTML had specific alphas. Use solid as per theme.
+        color: color,
         borderRadius: BorderRadius.circular(100),
         border: Border.all(
-          color: Colors.white.withOpacity(0.5),
+          color: Colors.white.withValues(alpha: 0.5),
           width: 1,
-        ), // approximate
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            word,
-            style: GoogleFonts.splineSans(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: Colors.black87,
+          Flexible(
+            child: Text(
+              word,
+              style: GoogleFonts.splineSans(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
+              ),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
           const SizedBox(width: 6),
@@ -364,7 +367,7 @@ class _EditCategoryScreenState extends State<EditCategoryScreen> {
               width: 20,
               height: 20,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.5),
+                color: Colors.white.withValues(alpha: 0.5),
                 shape: BoxShape.circle,
               ),
               child: const Icon(Icons.close, size: 14, color: Colors.black54),
@@ -395,7 +398,7 @@ class _EditCategoryScreenState extends State<EditCategoryScreen> {
           style: ElevatedButton.styleFrom(
             backgroundColor: theme.pastelMint, // soft-mint from html
             elevation: 4,
-            shadowColor: theme.pastelMint.withOpacity(0.5),
+            shadowColor: theme.pastelMint.withValues(alpha: 0.5),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
@@ -403,18 +406,19 @@ class _EditCategoryScreenState extends State<EditCategoryScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(
+              Icon(
                 Icons.check_circle,
-                color: Color(0xFF065F46),
-              ), // emerald-800
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSecondaryContainer, // Was emeraldText
+              ),
               const SizedBox(width: 8),
               Text(
                 'Save Changes',
                 style: GoogleFonts.splineSans(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: const Color(0xFF065F46), // emerald-800
-                  letterSpacing: 0.5,
+                  color: Theme.of(context).colorScheme.onSecondaryContainer,
                 ),
               ),
             ],

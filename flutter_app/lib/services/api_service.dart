@@ -35,6 +35,20 @@ class ApiService {
   /// In-memory cache for the session token to reduce storage reads.
   static String? _currentSessionToken;
 
+  /// Pre-fetches the session token to reduce latency for the first user interaction.
+  ///
+  /// This should be called early in the app lifecycle (e.g. main()).
+  /// Errors are caught silently so they don't crash the app start;
+  /// the lazy loading mechanism will handle retries later if this fails.
+  static Future<void> warmUp() async {
+    try {
+      print('[api_service] Warming up session token...');
+      await _getSessionToken();
+    } catch (e) {
+      print('[api_service] Warm-up failed (non-fatal): $e');
+    }
+  }
+
   /// Uses the device-generated attestation token to perform a secure handshake.
   /// The server will verify the token and return a session token.
 
@@ -107,7 +121,7 @@ class ApiService {
       if (response.statusCode == 200) {
         // Increment usage count on success
         if (!SubscriptionService().isPremium) {
-          UsageService().incrementRequestCount();
+          UsageService().consumeSpark();
         }
         return responseParser(response);
       }

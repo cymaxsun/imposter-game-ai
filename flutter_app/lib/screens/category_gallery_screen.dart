@@ -1,16 +1,18 @@
 import 'dart:math';
-import 'dart:io';
 import 'dart:ui' as ui;
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:pull_down_button/pull_down_button.dart';
+import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'edit_category_screen.dart';
 import 'ai_category_studio_screen.dart';
 import 'package:auto_size_text/auto_size_text.dart';
 import '../theme/pastel_theme.dart';
+
 import '../services/usage_service.dart';
 import '../services/subscription_service.dart';
 import 'paywall_screen.dart';
+import 'package:collection/collection.dart';
 
 class CategoryGalleryScreen extends StatefulWidget {
   final List<String> availableCategories;
@@ -18,8 +20,10 @@ class CategoryGalleryScreen extends StatefulWidget {
   final ValueChanged<Set<String>> onSelectionChanged;
   final Map<String, int> wordCounts;
   final ValueChanged<String> onDelete;
-  final Future<void> Function()? onCreate;
-  final Future<void> Function(String)? onEdit;
+  final Map<String, List<String>> categoryLists;
+  final Future<void> Function(String, List<String>)? onCreate;
+  final Future<void> Function(String, String, List<String>)? onEdit;
+  final ValueChanged<AiCategoryResult>? onResult;
 
   const CategoryGalleryScreen({
     super.key,
@@ -28,8 +32,10 @@ class CategoryGalleryScreen extends StatefulWidget {
     required this.onSelectionChanged,
     required this.wordCounts,
     required this.onDelete,
+    required this.categoryLists,
     this.onCreate,
     this.onEdit,
+    this.onResult,
   });
 
   @override
@@ -66,16 +72,26 @@ class _CategoryGalleryScreenState extends State<CategoryGalleryScreen>
   @override
   void didUpdateWidget(CategoryGalleryScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Always sync local categories with parent to ensure updates are reflected
+
+    // Sync available categories
     if (widget.availableCategories.length !=
             oldWidget.availableCategories.length ||
         !_areListsEqual(
           widget.availableCategories,
           oldWidget.availableCategories,
-        ) ||
-        widget.wordCounts != oldWidget.wordCounts) {
+        )) {
       setState(() {
         _localCategories = List.from(widget.availableCategories);
+      });
+    }
+
+    // Sync selection from parent if it changed (e.g. after a rename/delete refactor)
+    if (!const SetEquality<String>().equals(
+      widget.initiallySelected,
+      oldWidget.initiallySelected,
+    )) {
+      setState(() {
+        _selectedCategories = Set.from(widget.initiallySelected);
       });
     }
   }
@@ -101,105 +117,7 @@ class _CategoryGalleryScreenState extends State<CategoryGalleryScreen>
   }
 
   void _handleManualCreate() {
-    if (widget.onCreate != null) {
-      widget.onCreate!();
-    } else {
-      _navigateToEditor();
-    }
-  }
-
-  void _showCreateCategoryMenu(TapDownDetails details) async {
-    final position = RelativeRect.fromLTRB(
-      details.globalPosition.dx,
-      details.globalPosition.dy,
-      details.globalPosition.dx,
-      details.globalPosition.dy,
-    );
-
-    if (!UsageService().canSaveCategory && !SubscriptionService().isPremium) {
-      if (mounted) {
-        Navigator.of(
-          context,
-        ).push(MaterialPageRoute(builder: (context) => const PaywallScreen()));
-      }
-      return;
-    }
-
-    if (Platform.isIOS) {
-      final menuPosition = Rect.fromCenter(
-        center: details.globalPosition,
-        width: 0,
-        height: 0,
-      );
-
-      await showPullDownMenu(
-        context: context,
-        position: menuPosition,
-        items: [
-          PullDownMenuItem(
-            onTap: _handleManualCreate,
-            title: 'Write Manually',
-            icon: Icons.edit_note,
-          ),
-          PullDownMenuItem(
-            onTap: _navigateToAiStudio,
-            title: 'AI Studio',
-            icon: Icons.auto_awesome,
-            iconColor: const Color(0xFF6B5CE7),
-          ),
-        ],
-      );
-    } else {
-      final result = await showMenu<String>(
-        context: context,
-        position: position,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        items: [
-          PopupMenuItem(
-            value: 'manual',
-            child: Row(
-              children: [
-                Icon(Icons.edit_note, color: const Color(0xFF2D3748), size: 20),
-                const SizedBox(width: 12),
-                Text(
-                  'Write Manually',
-                  style: GoogleFonts.splineSans(
-                    fontWeight: FontWeight.w600,
-                    color: const Color(0xFF2D3748),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          PopupMenuItem(
-            value: 'ai',
-            child: Row(
-              children: [
-                Icon(
-                  Icons.auto_awesome,
-                  color: const Color(0xFF6B5CE7),
-                  size: 20,
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  'AI Wizard',
-                  style: GoogleFonts.splineSans(
-                    fontWeight: FontWeight.w600,
-                    color: const Color(0xFF2D3748),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      );
-
-      if (result == 'manual') {
-        _handleManualCreate();
-      } else if (result == 'ai') {
-        _navigateToAiStudio();
-      }
-    }
+    _navigateToEditor();
   }
 
   void _toggleSelection(String category) {
@@ -228,49 +146,27 @@ class _CategoryGalleryScreenState extends State<CategoryGalleryScreen>
   }
 
   Future<void> _confirmDelete(String category) async {
-    final pastelTheme = Theme.of(context).extension<PastelTheme>()!;
-    final confirmed = await showDialog<bool>(
+    bool confirmed = false;
+    await AdaptiveAlertDialog.show(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(
-          'Delete Category?',
-          style: GoogleFonts.splineSans(
-            fontWeight: FontWeight.bold,
-            color: pastelTheme.softCoral,
-          ),
-        ),
-        content: Text(
+      title: 'Delete Category?',
+      message:
           'Are you sure you want to delete "$category"?\nThis cannot be undone.',
-          style: GoogleFonts.splineSans(fontSize: 16),
+      actions: [
+        AlertAction(
+          title: 'Cancel',
+          style: AlertActionStyle.primary,
+          onPressed: () => confirmed = false,
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(
-              'Cancel',
-              style: GoogleFonts.splineSans(
-                fontWeight: FontWeight.w600,
-                color: Colors.grey,
-              ),
-            ),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(
-              'Delete',
-              style: GoogleFonts.splineSans(
-                fontWeight: FontWeight.bold,
-                color: pastelTheme.softCoral,
-              ),
-            ),
-          ),
-        ],
-      ),
+        AlertAction(
+          title: 'Delete',
+          style: AlertActionStyle.destructive,
+          onPressed: () => confirmed = true,
+        ),
+      ],
     );
 
-    if (confirmed == true) {
+    if (confirmed) {
       _deleteCategory(category);
     }
   }
@@ -286,18 +182,17 @@ class _CategoryGalleryScreenState extends State<CategoryGalleryScreen>
         builder: (context) => EditCategoryScreen(
           initialCategoryName: categoryName,
           initialWords: categoryName != null
-              ? widget.wordCounts.keys
-                    .firstWhere((k) => k == categoryName, orElse: () => '')
-                    .split(
-                      ' ',
-                    ) // This logic was flawed for words, but widget.onEdit should handle it now.
+              ? widget.categoryLists[categoryName] ?? []
               : [],
           onSave: (name, words) {
-            Navigator.pop(context);
             if (categoryName == null) {
-              widget.onCreate?.call();
+              widget.onCreate?.call(name, words);
             } else {
-              widget.onEdit?.call(name);
+              // This is the onEdit case.
+              // The actual logic for remembering selection and updating it
+              // should be handled by the parent's onEdit callback (widget.onEdit).
+              // This screen just passes the old and new names, and the words.
+              widget.onEdit?.call(categoryName, name, words);
             }
           },
         ),
@@ -316,16 +211,11 @@ class _CategoryGalleryScreenState extends State<CategoryGalleryScreen>
         )
         .then((result) {
           if (result != null && result is AiCategoryResult) {
-            // We received a new category.
-            // Since we don't have a direct 'add' callback that takes name+words,
-            // and 'onCreate' is generic refresh...
-            // We assume the parent (SetupScreen) handles the result if WE were the one launching it.
-            // But here CategoryGalleryScreen launched it.
-            // We need to signal SetupScreen.
-            // Assuming SetupScreen is listening to changes if we modify external state?
-            // Wait, SetupScreen holds the View Model.
-            // If we can't save it here, maybe we should pop with the result too?
-            Navigator.pop(context, result);
+            if (widget.onResult != null) {
+              widget.onResult!(result);
+            } else {
+              Navigator.pop(context, result);
+            }
           }
         });
   }
@@ -386,8 +276,48 @@ class _CategoryGalleryScreenState extends State<CategoryGalleryScreen>
                   itemCount: filteredList.length + (_isEditMode ? 1 : 0),
                   itemBuilder: (context, index) {
                     if (_isEditMode && index == 0) {
-                      return _CreateCategoryCard(
-                        onTapDown: _showCreateCategoryMenu,
+                      final canCreate =
+                          UsageService().canSaveCategory ||
+                          SubscriptionService().isPremium;
+
+                      if (!canCreate) {
+                        return GestureDetector(
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) => const PaywallScreen(),
+                              ),
+                            );
+                          },
+                          child: const _CreateCategoryCard(),
+                        );
+                      }
+
+                      return AdaptivePopupMenuButton.widget<String>(
+                        items: [
+                          AdaptivePopupMenuItem(
+                            label: 'Write Manually',
+                            icon: PlatformInfo.isIOS26OrHigher()
+                                ? 'pencil'
+                                : Icons.edit_note,
+                            value: 'manual',
+                          ),
+                          AdaptivePopupMenuItem(
+                            label: 'AI Studio',
+                            icon: PlatformInfo.isIOS26OrHigher()
+                                ? 'sparkles'
+                                : Icons.auto_awesome,
+                            value: 'ai',
+                          ),
+                        ],
+                        onSelected: (idx, item) {
+                          if (item.value == 'manual') {
+                            _handleManualCreate();
+                          } else if (item.value == 'ai') {
+                            _navigateToAiStudio();
+                          }
+                        },
+                        child: const _CreateCategoryCard(),
                       );
                     }
 
@@ -418,13 +348,7 @@ class _CategoryGalleryScreenState extends State<CategoryGalleryScreen>
                             color: color,
                             onTap: () async {
                               if (_isEditMode) {
-                                if (widget.onEdit != null) {
-                                  await widget.onEdit!(category);
-                                } else {
-                                  await _navigateToEditor(
-                                    categoryName: category,
-                                  );
-                                }
+                                await _navigateToEditor(categoryName: category);
                                 if (mounted) {
                                   setState(() {
                                     _isEditMode = false;
@@ -508,9 +432,7 @@ class _CategoryGalleryScreenState extends State<CategoryGalleryScreen>
                     child: Icon(
                       _isEditMode ? Icons.check : Icons.edit,
                       size: 24,
-                      color: _isEditMode
-                          ? pastelTheme.doneMint
-                          : const Color(0xFF307DE8),
+                      color: Theme.of(context).colorScheme.primary,
                     ),
                   ),
                 ),
@@ -523,10 +445,10 @@ class _CategoryGalleryScreenState extends State<CategoryGalleryScreen>
           Container(
             height: 44,
             decoration: BoxDecoration(
-              color: const Color(0xFF307DE8).withOpacity(0.1),
+              color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: const Color(0xFF307DE8).withOpacity(0.05),
+                color: Theme.of(context).colorScheme.primary.withOpacity(0.05),
               ),
             ),
             padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -534,7 +456,7 @@ class _CategoryGalleryScreenState extends State<CategoryGalleryScreen>
               children: [
                 Icon(
                   Icons.search,
-                  color: const Color(0xFF307DE8).withOpacity(0.6),
+                  color: Theme.of(context).colorScheme.primary.withOpacity(0.6),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -545,7 +467,9 @@ class _CategoryGalleryScreenState extends State<CategoryGalleryScreen>
                       hintText: 'Search categories...',
                       hintStyle: TextStyle(
                         fontSize: 14,
-                        color: const Color(0xFF307DE8).withOpacity(0.4),
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.primary.withOpacity(0.4),
                       ),
                       isDense: true,
                     ),
@@ -557,19 +481,28 @@ class _CategoryGalleryScreenState extends State<CategoryGalleryScreen>
                   Icon(
                     Icons.inventory_2,
                     size: 18,
-                    color: const Color(0xFF307DE8).withOpacity(0.7),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.primary.withOpacity(0.7),
                   ),
                   const SizedBox(width: 6),
-                  Text(
-                    SubscriptionService().isPremium
-                        ? '${UsageService().savedCategoryCount}'
-                        : '${UsageService().savedCategoryCount} / '
-                              '${UsageService().maxSavedCategories}',
-                    style: GoogleFonts.splineSans(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: const Color(0xFF307DE8).withOpacity(0.7),
-                    ),
+                  ListenableBuilder(
+                    listenable: SubscriptionService(),
+                    builder: (context, _) {
+                      return Text(
+                        SubscriptionService().isPremium
+                            ? '${UsageService().savedCategoryCount}'
+                            : '${UsageService().savedCategoryCount} / '
+                                  '${UsageService().maxSavedCategories}',
+                        style: GoogleFonts.splineSans(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.primary.withOpacity(0.7),
+                        ),
+                      );
+                    },
                   ),
                 ],
               ],
@@ -581,7 +514,7 @@ class _CategoryGalleryScreenState extends State<CategoryGalleryScreen>
               'Tap any card to edit its name or words',
               style: GoogleFonts.splineSans(
                 fontSize: 12,
-                color: const Color(0xFF307DE8).withOpacity(0.6),
+                color: Theme.of(context).colorScheme.primary.withOpacity(0.6),
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -592,6 +525,8 @@ class _CategoryGalleryScreenState extends State<CategoryGalleryScreen>
   }
 
   Widget _buildFooter(BuildContext context, PastelTheme pastelTheme) {
+    if (_isEditMode) return const SizedBox.shrink();
+
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -610,21 +545,17 @@ class _CategoryGalleryScreenState extends State<CategoryGalleryScreen>
         width: double.infinity,
         height: 56,
         child: ElevatedButton(
-          onPressed: _isEditMode ? _toggleEditMode : _onConfirm,
+          onPressed: _onConfirm,
           style: ElevatedButton.styleFrom(
-            backgroundColor: _isEditMode
-                ? pastelTheme.doneMint
-                : const Color(0xFF307DE8),
+            backgroundColor: Theme.of(context).colorScheme.primary,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
             ),
             elevation: 8,
-            shadowColor:
-                (_isEditMode ? pastelTheme.doneMint : const Color(0xFF307DE8))
-                    .withOpacity(0.4),
+            shadowColor: Theme.of(context).colorScheme.primary.withOpacity(0.4),
           ),
           child: Text(
-            _isEditMode ? 'Save Changes' : 'Confirm Selection',
+            'Confirm Selection',
             style: GoogleFonts.splineSans(
               fontSize: 16,
               fontWeight: FontWeight.bold,
@@ -708,7 +639,10 @@ class _CategoryCard extends StatelessWidget {
               border: isEditMode
                   ? null // Handled by CustomPaint
                   : (isSelected
-                        ? Border.all(color: const Color(0xFF307DE8), width: 3)
+                        ? Border.all(
+                            color: Theme.of(context).colorScheme.primary,
+                            width: 3,
+                          )
                         : null),
               boxShadow: isEditMode || isSelected
                   ? []
@@ -825,8 +759,8 @@ class _CategoryCard extends StatelessWidget {
               child: Container(
                 width: 24,
                 height: 24,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF307DE8),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primary,
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(Icons.check, size: 14, color: Colors.white),
@@ -839,48 +773,44 @@ class _CategoryCard extends StatelessWidget {
 }
 
 class _CreateCategoryCard extends StatelessWidget {
-  final Function(TapDownDetails)? onTapDown;
-
-  const _CreateCategoryCard({this.onTapDown});
+  const _CreateCategoryCard();
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: onTapDown != null ? (details) => onTapDown!(details) : null,
-      child: Container(
-        decoration: BoxDecoration(
-          color: const Color(0xFFF5F5F7), // Soft grey background
-          borderRadius: BorderRadius.circular(16),
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: CustomPaint(
+        foregroundPainter: _DashedBorderPainter(
+          color: colorScheme.outline.withValues(alpha: 0.5),
+          strokeWidth: 2,
+          gap: 6,
         ),
-        child: CustomPaint(
-          foregroundPainter: _DashedBorderPainter(
-            color: const Color(0xFFB0B0B5), // Dark grey dashed border
-            strokeWidth: 2,
-            gap: 6,
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF71717A), // Muted dark grey circle
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.add, color: Colors.white, size: 28),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: colorScheme.outline,
+                shape: BoxShape.circle,
               ),
-              const SizedBox(height: 12),
-              Text(
-                'Create New',
-                style: GoogleFonts.splineSans(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: const Color(0xFF52525B), // Dark grey text
-                ),
+              child: const Icon(Icons.add, color: Colors.white, size: 28),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Create New',
+              style: GoogleFonts.splineSans(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: colorScheme.onSurface,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

@@ -1,3 +1,4 @@
+import '../../theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:auto_size_text/auto_size_text.dart';
 
@@ -21,6 +22,8 @@ class CategoryDeckSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Container(
       height: MediaQuery.of(context).size.height * 0.8,
@@ -53,12 +56,15 @@ class CategoryDeckSheet extends StatelessWidget {
                   'Select Categories',
                   style: textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
-                    color: const Color(0xFF2D3436),
+                    color: colorScheme.onSurface, // Was 0xFF2D3436
                   ),
                 ),
                 IconButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.close, color: Color(0xFF2D3436)),
+                  icon: Icon(
+                    Icons.close,
+                    color: colorScheme.onSurface,
+                  ), // Was 0xFF2D3436
                 ),
               ],
             ),
@@ -162,15 +168,21 @@ class _DeckItemCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: onRemove,
       child: Container(
         width: 140,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         decoration: BoxDecoration(
-          color: const Color(0xFFF0F4FF), // Light blue tint
+          color: colorScheme.primary.withValues(
+            alpha: 0.1,
+          ), // Was 0xFFF0F4FF (Light blue tint) -> Primary Brand 10%
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFF6C5CE7), width: 1.5),
+          border: Border.all(
+            color: colorScheme.primary,
+            width: 1.5,
+          ), // Was 0xFF6C5CE7
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -178,10 +190,10 @@ class _DeckItemCard extends StatelessWidget {
             Expanded(
               child: AutoSizeText(
                 category,
-                style: const TextStyle(
+                style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 14,
-                  color: Color(0xFF6C5CE7),
+                  color: colorScheme.primary, // Was 0xFF6C5CE7
                 ),
                 maxLines: 1,
                 minFontSize: 8,
@@ -189,7 +201,11 @@ class _DeckItemCard extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 4),
-            const Icon(Icons.close, size: 16, color: Color(0xFF6C5CE7)),
+            Icon(
+              Icons.close,
+              size: 16,
+              color: colorScheme.primary,
+            ), // Was 0xFF6C5CE7
           ],
         ),
       ),
@@ -219,6 +235,8 @@ class _CategoryGridCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final icon = _categoryIcons[category] ?? Icons.category;
+    final colorScheme = Theme.of(context).colorScheme;
+    final customColors = Theme.of(context).extension<CustomColors>()!;
 
     return GestureDetector(
       onTap: onTap,
@@ -250,7 +268,7 @@ class _CategoryGridCard extends StatelessWidget {
                       size: 32,
                       color: isSelected
                           ? Colors.grey.shade400
-                          : const Color(0xFF2D3436),
+                          : colorScheme.onSurface, // Was 0xFF2D3436
                     ),
                     const SizedBox(height: 8),
                     AutoSizeText(
@@ -260,7 +278,7 @@ class _CategoryGridCard extends StatelessWidget {
                         fontSize: 16,
                         color: isSelected
                             ? Colors.grey.shade400
-                            : const Color(0xFF2D3436),
+                            : colorScheme.onSurface, // Was 0xFF2D3436
                       ),
                       textAlign: TextAlign.center,
                       maxLines: 2,
@@ -277,8 +295,8 @@ class _CategoryGridCard extends StatelessWidget {
                 right: 8,
                 child: Container(
                   padding: const EdgeInsets.all(4),
-                  decoration: const BoxDecoration(
-                    color: Colors.green, // Checkmark badge
+                  decoration: BoxDecoration(
+                    color: customColors.succeed!, // Was Colors.green
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(Icons.check, size: 12, color: Colors.white),

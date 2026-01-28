@@ -1,5 +1,4 @@
 import 'dart:developer' as developer;
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:timezone/data/latest.dart' as tz;
@@ -18,43 +17,62 @@ class UsageService extends ChangeNotifier {
 
   static const _storage = FlutterSecureStorage();
 
-  static const int _maxDailyRequests = 3;
+  static const int _maxSparks = 1;
   static const int _maxSavedCategories = 5;
 
-  // Pro user limits - adjust these values as needed
-  static const int _maxDailyRequestsPro = 100;
-  // Note: Pro users have unlimited saved categories (no _maxSavedCategoriesPro)
+  // Pro user limits
+  static const int _maxSparksPro = 100; // Effectively unlimited relative to 3
 
-  static const String _keyDailyCount = 'daily_request_count';
+  static const String _keySparks = 'remaining_sparks';
   static const String _keyLastReset = 'last_reset_time';
 
-  int _dailyRequestCount = 0;
-  int _savedCategoryCount = 0; // Injected or fetched from repository
+  int _remainingSparks = _maxSparks;
+  int _savedCategoryCount = 0;
 
-  int get dailyRequestCount => _dailyRequestCount;
-  int get maxDailyRequests => SubscriptionService().isPremium
-      ? _maxDailyRequestsPro
-      : _maxDailyRequests;
-  int get maxSavedCategories =>
-      _maxSavedCategories; // Pro users have unlimited (checked in canSaveCategory)
+  int get remainingSparks => _remainingSparks;
+
+  int get maxSparks =>
+      SubscriptionService().isPremium ? _maxSparksPro : _maxSparks;
+
+  int get maxSavedCategories => _maxSavedCategories;
   int get savedCategoryCount => _savedCategoryCount;
 
   Future<void> init() async {
     tz.initializeTimeZones();
-    // tz.initializeTimeZones(); // Already initialized in main? keeping if needed
-    // Assuming main calls tz.initializeTimeZones now or simpler to keep it here if cheap.
-    // Actually typically initTimeZones is cheap.
 
-    final dailyStr = await _storage.read(key: _keyDailyCount);
-    _dailyRequestCount = dailyStr != null ? int.tryParse(dailyStr) ?? 0 : 0;
+    final sparksStr = await _storage.read(key: _keySparks);
+    if (sparksStr != null) {
+      _remainingSparks = int.tryParse(sparksStr) ?? maxSparks;
+    } else {
+      _remainingSparks = maxSparks; // Default to full (respects Pro status)
+    }
 
     final resetStr = await _storage.read(key: _keyLastReset);
     final lastReset = resetStr != null ? int.tryParse(resetStr) ?? 0 : 0;
+
     developer.log(
-      'Init: dailyRequestCount: $_dailyRequestCount, lastReset: $lastReset',
+      'Init: remainingSparks: $_remainingSparks, lastReset: $lastReset',
       name: 'usage_service',
     );
-    await _checkAndResetDailyLimit(lastReset);
+
+    // Listen to subscription changes to refresh UI and sync sparks
+    SubscriptionService().addListener(_handleSubscriptionChange);
+
+    await _checkAndRefillSparks(lastReset);
+  }
+
+  void _handleSubscriptionChange() {
+    // If the user just upgraded, ensure they have the Pro limit
+    if (SubscriptionService().isPremium && _remainingSparks < _maxSparksPro) {
+      _remainingSparks = _maxSparksPro;
+      _saveSparks();
+    } else if (!SubscriptionService().isPremium &&
+        _remainingSparks > _maxSparks) {
+      // If they downgraded, cap them at the Free limit
+      _remainingSparks = _maxSparks;
+      _saveSparks();
+    }
+    notifyListeners();
   }
 
   void updateSavedCategoryCount(int count) {
@@ -63,35 +81,47 @@ class UsageService extends ChangeNotifier {
   }
 
   bool get canMakeRequest {
-    return _dailyRequestCount < _maxDailyRequests;
+    if (SubscriptionService().isPremium) return true;
+    return _remainingSparks > 0;
   }
 
   bool get canSaveCategory {
-    // Pro users have unlimited saved categories
     if (SubscriptionService().isPremium) return true;
     return _savedCategoryCount < _maxSavedCategories;
   }
 
-  Future<void> incrementRequestCount() async {
-    if (!canMakeRequest) return;
-
-    _dailyRequestCount++;
-    await _storage.write(
-      key: _keyDailyCount,
-      value: _dailyRequestCount.toString(),
-    );
-    notifyListeners();
+  // Formerly incrementRequestCount
+  Future<void> consumeSpark() async {
+    if (_remainingSparks > 0) {
+      _remainingSparks--;
+      await _saveSparks();
+      notifyListeners();
+    }
   }
 
-  Future<void> _checkAndResetDailyLimit(int lastResetEpoch) async {
-    // Fetch network time to prevent device time manipulation
+  // Formerly grantBonusRequest
+  Future<void> addSpark() async {
+    if (_remainingSparks < maxSparks) {
+      _remainingSparks++;
+      await _saveSparks();
+      notifyListeners();
+      developer.log(
+        'Added spark. New count: $_remainingSparks',
+        name: 'usage_service',
+      );
+    }
+  }
+
+  Future<void> _saveSparks() async {
+    await _storage.write(key: _keySparks, value: _remainingSparks.toString());
+  }
+
+  Future<void> _checkAndRefillSparks(int lastResetEpoch) async {
     final networkTime = await TimeService().getNetworkTimeEST();
 
     if (networkTime == null) {
-      // No internet = can't verify time, don't reset (be cautious)
-      // AI generation requires internet anyway, so this is fine
       developer.log(
-        'Could not fetch network time, skipping daily limit check',
+        'Could not fetch network time, skipping spark check',
         name: 'usage_service',
       );
       return;
@@ -107,23 +137,26 @@ class UsageService extends ChangeNotifier {
     if (now.year != lastReset.year ||
         now.month != lastReset.month ||
         now.day != lastReset.day) {
-      _dailyRequestCount = 0;
-      await _storage.write(key: _keyDailyCount, value: '0');
+      // Refill to full
+      _remainingSparks = maxSparks;
+      await _saveSparks();
+
       await _storage.write(
         key: _keyLastReset,
         value: now.millisecondsSinceEpoch.toString(),
       );
       developer.log(
-        'Daily limit reset (new day detected via network time)',
+        'Sparks refilled (new day detected). New limit: $maxSparks',
         name: 'usage_service',
       );
       notifyListeners();
     }
   }
 
+  // For debug/testing
   Future<void> resetDailyLimit() async {
-    _dailyRequestCount = 0;
-    await _storage.write(key: _keyDailyCount, value: '0');
+    _remainingSparks = maxSparks;
+    await _saveSparks();
     notifyListeners();
   }
 }

@@ -188,6 +188,21 @@ class SetupViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Renames a category in the repository.
+  void renameCategory(String oldName, String newName, List<String> words) {
+    _wordRepository.renameCategory(oldName, newName, words);
+    _syncSavedCategoryCount();
+
+    // If renamed category was selected, replace with new one
+    if (_settings.selectedCategories.contains(oldName)) {
+      final newSelected = Set<String>.from(_settings.selectedCategories)
+        ..remove(oldName)
+        ..add(newName);
+      _settings = _settings.copyWith(selectedCategories: newSelected);
+    }
+    notifyListeners();
+  }
+
   /// Deletes a category from the repository.
   void deleteCategory(String category) {
     _wordRepository.deleteCategory(category);
@@ -196,9 +211,6 @@ class SetupViewModel extends ChangeNotifier {
     if (_settings.selectedCategories.contains(category)) {
       final newSelected = Set<String>.from(_settings.selectedCategories)
         ..remove(category);
-      // Ensure at least one category is selected if possible, or allow empty?
-      // Logic above suggests we try to keep 1, but if deleted, we might have 0.
-      // Let's just update.
       _settings = _settings.copyWith(selectedCategories: newSelected);
     }
     notifyListeners();
@@ -225,11 +237,8 @@ class SetupViewModel extends ChangeNotifier {
     final selected = _settings.selectedCategories
         .where(available.contains)
         .toSet();
-    if (selected.isEmpty && available.isNotEmpty) {
-      selected.add(available.first);
-    }
-    if (selected.isNotEmpty &&
-        selected.length != _settings.selectedCategories.length) {
+
+    if (selected.length != _settings.selectedCategories.length) {
       _settings = _settings.copyWith(selectedCategories: selected);
     }
   }

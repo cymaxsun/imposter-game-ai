@@ -1,21 +1,15 @@
 import 'package:flutter/material.dart';
-import 'screens/setup_screen.dart';
+import 'screens/splash_screen.dart';
+import 'services/api_service.dart';
 import 'theme/app_theme.dart';
-import 'services/usage_service.dart';
-import 'services/subscription_service.dart';
 
 /// Entry point for the Imposter Finder application.
-void main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize services
-
-  await UsageService().init();
-  try {
-    await SubscriptionService().init();
-  } catch (e) {
-    debugPrint('Failed to initialize SubscriptionService: $e');
-  }
+  // Start the auth handshake immediately in the background.
+  // We do NOT await this; let it race with the UI startup.
+  ApiService.warmUp();
 
   runApp(const ImposterFinderApp());
 }
@@ -23,7 +17,7 @@ void main() async {
 /// Root widget for the Imposter Finder app.
 ///
 /// Configures the [MaterialApp] with both light and dark themes,
-/// and sets the initial route to [SetupScreen].
+/// and sets the initial route to [SplashScreen].
 class ImposterFinderApp extends StatelessWidget {
   /// Creates the root [ImposterFinderApp] widget.
   const ImposterFinderApp({super.key});
@@ -36,7 +30,7 @@ class ImposterFinderApp extends StatelessWidget {
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.system, // Respects system preference
-      home: const SetupScreen(),
+      home: const SplashScreen(),
     );
   }
 }

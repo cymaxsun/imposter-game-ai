@@ -1,55 +1,9 @@
 import 'package:flutter/material.dart';
 import 'pastel_theme.dart';
 
-/// Original color palette for the Imposter Finder app (classic warm tones).
-///
-/// Provides a consistent set of brand colors used throughout the application.
-class AppPalette {
-  static const Color inkBlack = Color(0xFF0d1821);
-  static const Color yaleBlue = Color(0xFF344966);
-  static const Color powderBlue = Color(0xFFb4cded);
-  static const Color porcelain = Color(0xFFf0f4ef);
-  static const Color drySage = Color(0xFFbfcc94);
-}
-
-/// Classic light theme palette (original colors).
-///
-/// To revert to this palette, set `AppTheme.useClassicLightPalette = true`.
-class LightPaletteClassic {
-  static const Color primary = Color(0xFF344966); // Yale Blue
-  static const Color secondary = Color(0xFFbfcc94); // Dry Sage
-  static const Color tertiary = Color(0xFFb4cded); // Powder Blue
-  static const Color surface = Color(0xFFf0f4ef); // Porcelain
-  static const Color onSurface = Color(0xFF0d1821); // Ink Black
-  static const Color cardColor = Colors.white;
-  static const Color cardShadow = Color(0x22344966);
-  static const Color buttonBackground = Color(0xFF344966);
-  static const Color buttonForeground = Color(0xFFf0f4ef);
-  static const Color headlineColor = Color(0xFF344966);
-  static const Color bodyColor = Color(0xFF0d1821);
-  static const Color iconColor = Color(0xFF344966);
-  static const Color successColor = Color(0xFFbfcc94);
-}
-
 /// Stitch-inspired pastel light theme palette (family-friendly).
 ///
 /// Soft, playful colors inspired by the Stitch game settings design.
-class LightPaletteClean {
-  static const Color primary = Color(0xFF90CAF9); // Blue Accent
-  static const Color secondary = Color(0xFF80CBC4); // Mint Dark
-  static const Color tertiary = Color(0xFFFFF59D); // Yellow Accent
-  static const Color surface = Color(0xFFF8FAFC); // iOS Background
-  static const Color onSurface = Color(0xFF455A64); // Text Main
-  static const Color cardColor = Colors.white;
-  static const Color cardShadow = Color(0x0A000000); // Pastel shadow
-  static const Color buttonBackground = Color(0xFF90CAF9); // Blue Accent
-  static const Color buttonForeground = Colors.white;
-  static const Color headlineColor = Color(0xFF455A64); // Text Main
-  static const Color bodyColor = Color(0xFF455A64); // Text Main
-  static const Color iconColor = Color(0xFF90CAF9); // Blue Accent
-  static const Color successColor = Color(0xFF80CBC4); // Mint Dark
-}
-
 /// Custom colors for semantic use throughout the app.
 ///
 /// Defines success and warning colors that can be accessed via
@@ -285,69 +239,56 @@ class GameScreenColors extends ThemeExtension<GameScreenColors> {
 ///
 /// Provides both light and dark themes using Material 3 design principles.
 class AppTheme {
-  /// Set to `true` to use the original warm-toned color palette.
-  /// Set to `false` to use the new white/grey with blue highlights palette.
-  static bool useClassicLightPalette = false;
-
-  /// Light theme configuration.
-  ///
-  /// Colors are determined by [useClassicLightPalette].
-  /// - `false` (default): Clean white/grey with blue highlights
-  /// - `true`: Original warm-toned Yale Blue/Porcelain palette
   static ThemeData get lightTheme {
-    // Select palette based on toggle
-    final primary = useClassicLightPalette
-        ? LightPaletteClassic.primary
-        : LightPaletteClean.primary;
-    final secondary = useClassicLightPalette
-        ? LightPaletteClassic.secondary
-        : LightPaletteClean.secondary;
-    final tertiary = useClassicLightPalette
-        ? LightPaletteClassic.tertiary
-        : LightPaletteClean.tertiary;
-    final surface = useClassicLightPalette
-        ? LightPaletteClassic.surface
-        : LightPaletteClean.surface;
-    final onSurface = useClassicLightPalette
-        ? LightPaletteClassic.onSurface
-        : LightPaletteClean.onSurface;
-    final cardColor = useClassicLightPalette
-        ? LightPaletteClassic.cardColor
-        : LightPaletteClean.cardColor;
-    final cardShadow = useClassicLightPalette
-        ? LightPaletteClassic.cardShadow
-        : LightPaletteClean.cardShadow;
-    final buttonBackground = useClassicLightPalette
-        ? LightPaletteClassic.buttonBackground
-        : LightPaletteClean.buttonBackground;
-    final buttonForeground = useClassicLightPalette
-        ? LightPaletteClassic.buttonForeground
-        : LightPaletteClean.buttonForeground;
-    final headlineColor = useClassicLightPalette
-        ? LightPaletteClassic.headlineColor
-        : LightPaletteClean.headlineColor;
-    final bodyColor = useClassicLightPalette
-        ? LightPaletteClassic.bodyColor
-        : LightPaletteClean.bodyColor;
-    final iconColor = useClassicLightPalette
-        ? LightPaletteClassic.iconColor
-        : LightPaletteClean.iconColor;
-    final successColor = useClassicLightPalette
-        ? LightPaletteClassic.successColor
-        : LightPaletteClean.successColor;
+    // --- Core Palette (Formerly LightPaletteClean) ---
+    const Color surface = Color(0xFFF8FAFC); // iOS Background
+    const Color onSurface = Color(0xFF455A64); // Text Main
+    const Color cardColor = Colors.white;
+    const Color cardShadow = Color(0x0A000000); // Pastel shadow
+    const Color buttonBackground = Color(0xFF90CAF9); // Blue Accent
+    const Color buttonForeground = Colors.white;
+    const Color headlineColor = Color(0xFF455A64); // Text Main
+    const Color bodyColor = Color(0xFF455A64); // Text Main
+    const Color iconColor = Color(0xFF90CAF9); // Blue Accent
+    const Color successColor = Color(0xFF80CBC4); // Mint Dark
+
+    // --- Semantic Brand Colors ---
+    const Color primaryBrand = Color(0xFF307DE8);
+    const Color secondaryBrand = Color(0xFF8B7CF6);
+    const Color accent = Color(0xFF6347EB);
+    const Color heroYellow = Color(0xFFBDA02E);
+    const Color offWhiteBackground = Color(0xFFFDFCF8);
+    const Color softSurface = Color(0xFFF9FAFB);
+    const Color deepCharcoal = Color(0xFF121118);
+    const Color softLavender = Color(0xFFE6E1FF);
+    const Color vibrantMint = Color(0xFFBBF7D0);
+    const Color emeraldText = Color(0xFF065F46);
+    const Color slateText = Color(0xFF718096);
 
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: primary,
+      colorScheme: ColorScheme(
         brightness: Brightness.light,
-        primary: primary,
-        secondary: secondary,
-        tertiary: tertiary,
-        surface: surface,
-        onSurface: onSurface,
-        outline: tertiary,
+        primary: primaryBrand,
+        onPrimary: offWhiteBackground,
+        secondary: secondaryBrand,
+        onSecondary: offWhiteBackground,
+        tertiary: accent,
+        onTertiary: offWhiteBackground,
+        error: Colors.redAccent,
+        onError: offWhiteBackground,
+        surface: offWhiteBackground,
+        onSurface: deepCharcoal,
+        // Detailed mappings
+        primaryContainer: softLavender,
+        onPrimaryContainer: primaryBrand,
+        secondaryContainer: vibrantMint,
+        onSecondaryContainer: emeraldText,
+        tertiaryContainer: heroYellow,
+        onTertiaryContainer: deepCharcoal, // readable on yellow?
+        surfaceContainer: softSurface,
+        outline: slateText,
       ),
       scaffoldBackgroundColor: surface,
       cardTheme: CardThemeData(
@@ -413,6 +354,8 @@ class AppTheme {
         ),
         GameScreenColors.light,
         PastelTheme.light,
+
+        AiStudioColors.light,
       ],
     );
   }
@@ -423,5 +366,47 @@ class AppTheme {
   /// family-friendly feel in dark mode.
   static ThemeData get darkTheme {
     return lightTheme;
+  }
+}
+
+/// Specific colors for the AI Studio feature (Material Purple theme).
+@immutable
+class AiStudioColors extends ThemeExtension<AiStudioColors> {
+  const AiStudioColors({
+    required this.primary,
+    required this.background,
+    required this.border,
+  });
+
+  final Color primary;
+  final Color background;
+  final Color border;
+
+  static const AiStudioColors lightTheme = AiStudioColors(
+    primary: Color(0xFF9C27B0),
+    background: Color(0xFFF3E5F5),
+    border: Color(0xFFCE93D8),
+  );
+
+  // Alias for consistency with other extensions
+  static const light = lightTheme;
+
+  @override
+  AiStudioColors copyWith({Color? primary, Color? background, Color? border}) {
+    return AiStudioColors(
+      primary: primary ?? this.primary,
+      background: background ?? this.background,
+      border: border ?? this.border,
+    );
+  }
+
+  @override
+  AiStudioColors lerp(ThemeExtension<AiStudioColors>? other, double t) {
+    if (other is! AiStudioColors) return this;
+    return AiStudioColors(
+      primary: Color.lerp(primary, other.primary, t)!,
+      background: Color.lerp(background, other.background, t)!,
+      border: Color.lerp(border, other.border, t)!,
+    );
   }
 }

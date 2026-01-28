@@ -412,8 +412,8 @@ class _ActionButton extends StatelessWidget {
             child: FilledButton(
               onPressed: isFront ? null : onPressed,
               style: FilledButton.styleFrom(
-                backgroundColor: gameColors.buttonPrimary,
-                disabledBackgroundColor: gameColors.buttonPrimary,
+                backgroundColor: Color(0xFF307DE8),
+                disabledBackgroundColor: Color(0xFF307DE8),
                 minimumSize: const Size(double.infinity, 56),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(
@@ -489,7 +489,7 @@ class _CardFrontState extends State<_CardFront>
         Theme.of(context).extension<GameScreenColors>() ??
         GameScreenColors.light;
 
-    final primaryNavy = gameColors.cardFrontPrimary;
+    final primaryNavy = Color(0xFF307DE8);
     final cardBg = gameColors.cardFrontBackground;
     final textDark = gameColors.cardFrontTextDark;
     final textMuted = gameColors.cardFrontTextMuted;
@@ -947,9 +947,6 @@ class _DiscussionViewState extends State<_DiscussionView>
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final gameColors =
-        Theme.of(context).extension<GameScreenColors>() ??
-        GameScreenColors.light;
 
     const timerAccent = Color(0xFFD4A017);
     final progress = widget.timeLimitSeconds > 0 && widget.timeLeft != null
@@ -985,10 +982,7 @@ class _DiscussionViewState extends State<_DiscussionView>
                     : const _WhoIsTheImposterSection(),
               ),
               if (!widget.imposterRevealed)
-                _RevealButton(
-                  onReveal: widget.onReveal,
-                  gameColors: gameColors,
-                ),
+                _RevealButton(onReveal: widget.onReveal),
             ],
           ),
         ),
@@ -1392,7 +1386,6 @@ class _InfoRow extends StatelessWidget {
         minFontSize: 6,
         overflow: TextOverflow.ellipsis,
         textAlign: isVertical ? TextAlign.center : TextAlign.end,
-        
       );
     }
 
@@ -1536,9 +1529,8 @@ class _WhoIsTheImposterSection extends StatelessWidget {
 
 class _RevealButton extends StatelessWidget {
   final VoidCallback onReveal;
-  final GameScreenColors gameColors;
 
-  const _RevealButton({required this.onReveal, required this.gameColors});
+  const _RevealButton({required this.onReveal});
 
   @override
   Widget build(BuildContext context) {
@@ -1548,7 +1540,7 @@ class _RevealButton extends StatelessWidget {
         child: FilledButton(
           onPressed: onReveal,
           style: FilledButton.styleFrom(
-            backgroundColor: gameColors.buttonPrimary,
+            backgroundColor: Theme.of(context).colorScheme.primary,
             minimumSize: const Size(double.infinity, 56),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(

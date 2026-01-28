@@ -46,7 +46,7 @@ class GameSettings {
       showImposterHints: false,
       randomizeImposters: false,
       timeLimitSeconds: 120,
-      selectedCategories: {'Animals'},
+      selectedCategories: {},
     );
   }
 

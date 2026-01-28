@@ -1,16 +1,17 @@
 import 'dart:async';
 import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../utils/ui_utils.dart';
 import 'game_screen.dart';
+import '../theme/pastel_theme.dart';
 import '../theme/app_theme.dart';
 import 'ai_category_studio_screen.dart';
 import '../viewmodels/setup_view_model.dart';
 import 'category_gallery_screen.dart';
-import 'edit_category_screen.dart';
 import 'paywall_screen.dart';
+import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import '../services/subscription_service.dart';
 
 /// Stitch-inspired setup screen with pastel colors and friendly layout.
@@ -48,17 +49,42 @@ class _SetupScreenState extends State<SetupScreen> {
         ),
       ),
     );
-    // If AiCategoryStudioScreen returns a new category, add it
     if (result != null) {
-      _viewModel.addCategory(result.name, result.words);
+      _handleAiStudioResult(result);
+      if (result.openGallery) {
+        if (!mounted) return;
+        _navigateToCategoryGallery(context);
+      }
+    }
+  }
+
+  void _handleAiStudioResult(AiCategoryResult result) {
+    if (result.name != null && result.words != null) {
+      _viewModel.addCategory(result.name!, result.words!);
       if (result.selectAfterSave) {
-        _viewModel.selectCategory(result.name);
+        _viewModel.selectCategory(result.name!);
       }
     }
   }
 
   void _startGame() {
-    if (_viewModel.activeWordList.isEmpty) return;
+    if (_viewModel.settings.selectedCategories.isEmpty) {
+      showIosSnackBar(
+        context,
+        'Please select a category to start!',
+        isError: true,
+      );
+      return;
+    }
+
+    if (_viewModel.activeWordList.isEmpty) {
+      showIosSnackBar(
+        context,
+        'Selected categories have no words!',
+        isError: true,
+      );
+      return;
+    }
 
     int imposterCount = _viewModel.settings.imposterCount;
     if (_viewModel.settings.randomizeImposters) {
@@ -88,6 +114,7 @@ class _SetupScreenState extends State<SetupScreen> {
     final gameColors =
         Theme.of(context).extension<GameScreenColors>() ??
         GameScreenColors.light;
+
     final iosBg = Theme.of(context).scaffoldBackgroundColor;
 
     return ListenableBuilder(
@@ -102,7 +129,10 @@ class _SetupScreenState extends State<SetupScreen> {
               children: [
                 CustomScrollView(
                   slivers: [
-                    _StickyHeader(textMain: gameColors.cardFrontTextDark),
+                    _StickyHeader(
+                      textMain: gameColors.cardFrontTextDark,
+                      onHowToPlay: () => _showHowToPlayDialog(context),
+                    ),
                     SliverPadding(
                       padding: const EdgeInsets.fromLTRB(16, 24, 16, 160),
                       sliver: SliverList(
@@ -143,12 +173,7 @@ class _SetupScreenState extends State<SetupScreen> {
                     ),
                   ],
                 ),
-                if (!isKeyboardOpen)
-                  _StartButton(
-                    onTap: _viewModel.activeWordList.isNotEmpty
-                        ? _startGame
-                        : null,
-                  ),
+                if (!isKeyboardOpen) _StartButton(onTap: _startGame),
               ],
             ),
           ),
@@ -157,23 +182,17 @@ class _SetupScreenState extends State<SetupScreen> {
     );
   }
 
-  Future<void> _navigateToEditCategory({String? initialCategory}) {
-    return Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => EditCategoryScreen(
-          initialCategoryName: initialCategory,
-          initialWords: initialCategory != null
-              ? _viewModel.categoryLists[initialCategory] ?? []
-              : [],
-          onSave: (newName, newWords) {
-            if (initialCategory != null && initialCategory != newName) {
-              _viewModel.deleteCategory(initialCategory);
-            }
-            _viewModel.addCategory(newName, newWords);
-
-            // If checking "Select after create":
-            // _viewModel.toggleCategory(newName);
-          },
+  void _showHowToPlayDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => Center(
+        child: SingleChildScrollView(
+          child: Dialog(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            insetPadding: const EdgeInsets.symmetric(horizontal: 16),
+            child: const _HowToPlayCard(),
+          ),
         ),
       ),
     );
@@ -194,49 +213,56 @@ class _SetupScreenState extends State<SetupScreen> {
                   category: _viewModel.getCategoryWordCount(category),
               },
               onDelete: _viewModel.deleteCategory,
-              onCreate: () => _navigateToEditCategory(),
-              onEdit: (category) =>
-                  _navigateToEditCategory(initialCategory: category),
+              categoryLists: _viewModel.categoryLists,
+              onCreate: (name, words) async {
+                _viewModel.addCategory(name, words);
+              },
+              onEdit: (oldName, newName, words) async {
+                _viewModel.renameCategory(oldName, newName, words);
+              },
+              onResult: _handleAiStudioResult,
             );
           },
         ),
       ),
     );
     if (result == null) return;
-    _viewModel.addCategory(result.name, result.words);
-    if (result.selectAfterSave) {
-      _viewModel.selectCategory(result.name);
-    }
+    _handleAiStudioResult(result);
   }
 }
 
 class _StickyHeader extends StatelessWidget {
   final Color textMain;
+  final VoidCallback onHowToPlay;
 
-  const _StickyHeader({required this.textMain});
+  const _StickyHeader({required this.textMain, required this.onHowToPlay});
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return SliverAppBar(
       pinned: true,
       toolbarHeight: 56,
-      backgroundColor: Colors.white.withValues(alpha: 0.7),
+      backgroundColor: colorScheme.surface.withValues(
+        alpha: 0.7,
+      ), // Was Colors.white
       elevation: 0,
       leading: Padding(
         padding: const EdgeInsets.only(left: 8),
         child: Center(
           child: GestureDetector(
-            onTap: () => _showHowToPlayDialog(context),
+            onTap: onHowToPlay,
             child: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.grey.shade100,
+                color: Colors.grey.shade100, // Reverted softSurface
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
                 Icons.help_outline,
                 size: 20,
-                color: Colors.grey.shade600,
+                color: colorScheme.outline, // Was Colors.grey.shade600
               ),
             ),
           ),
@@ -246,7 +272,10 @@ class _StickyHeader extends StatelessWidget {
         child: Container(
           decoration: BoxDecoration(
             border: Border(
-              bottom: BorderSide(color: Colors.grey.shade100, width: 1),
+              bottom: BorderSide(
+                color: Colors.grey.shade100, // Reverted softSurface
+                width: 1,
+              ), // Was Colors.grey.shade100
             ),
           ),
         ),
@@ -271,113 +300,6 @@ class _StickyHeader extends StatelessWidget {
       ],
     );
   }
-
-  static void _showHowToPlayDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            Icon(Icons.help_outline, color: Theme.of(ctx).colorScheme.primary),
-            const SizedBox(width: 8),
-            const Text('How to Play'),
-          ],
-        ),
-        content: const SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _HowToPlayStep(
-                number: '1',
-                title: 'Setup',
-                description: 'Add players and choose a category.',
-              ),
-              SizedBox(height: 12),
-              _HowToPlayStep(
-                number: '2',
-                title: 'Pass the Phone',
-                description:
-                    'Each player secretly views their word. Imposters get a different word (or no word).',
-              ),
-              SizedBox(height: 12),
-              _HowToPlayStep(
-                number: '3',
-                title: 'Discuss',
-                description:
-                    'Take turns describing your word without saying it directly.',
-              ),
-              SizedBox(height: 12),
-              _HowToPlayStep(
-                number: '4',
-                title: 'Vote',
-                description: 'Vote to eliminate who you think is the Imposter!',
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Got it!'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _HowToPlayStep extends StatelessWidget {
-  final String number;
-  final String title;
-  final String description;
-
-  const _HowToPlayStep({
-    required this.number,
-    required this.title,
-    required this.description,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: 24,
-          height: 24,
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Center(
-            child: Text(
-              number,
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 2),
-              Text(
-                description,
-                style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
 }
 
 class _SubscriptionBadge extends StatelessWidget {
@@ -385,54 +307,66 @@ class _SubscriptionBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Import these at top of file if not already present
-    final isPremium = SubscriptionService().isPremium;
+    final colorScheme = Theme.of(context).colorScheme;
 
-    final backgroundColor = isPremium
-        ? const Color(0xFFFFF8E1) // Gold tint for Pro
-        : Colors.grey.shade100;
-    final textColor = isPremium
-        ? const Color(0xFFFF8F00) // Amber for Pro
-        : Colors.grey.shade600;
-    final icon = isPremium ? Icons.star : null;
+    return ListenableBuilder(
+      listenable: SubscriptionService(),
+      builder: (context, _) {
+        final isPremium = SubscriptionService().isPremium;
 
-    return GestureDetector(
-      onTap: isPremium
-          ? null
-          : () {
-              Navigator.of(
-                context,
-              ).push(MaterialPageRoute(builder: (_) => const PaywallScreen()));
-            },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-        decoration: BoxDecoration(
-          color: backgroundColor,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: isPremium ? const Color(0xFFFFD54F) : Colors.grey.shade300,
-            width: 0.5,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (icon != null) ...[
-              Icon(icon, size: 10, color: textColor),
-              const SizedBox(width: 2),
-            ],
-            Text(
-              isPremium ? 'PRO' : 'FREE',
-              style: TextStyle(
-                fontSize: 9,
-                fontWeight: FontWeight.bold,
-                color: textColor,
-                letterSpacing: 0.3,
+        final backgroundColor = isPremium
+            ? colorScheme.tertiaryContainer.withValues(
+                alpha: 0.1,
+              ) // Was 0xFFFFF8E1 (Amber 50)
+            : Colors.grey.shade100;
+        final textColor = isPremium
+            ? colorScheme
+                  .tertiaryContainer // Was 0xFFFF8F00 (Amber 800) -> Using Hero Yellow
+            : Colors.grey.shade600;
+        final icon = isPremium ? Icons.star : null;
+
+        return GestureDetector(
+          onTap: isPremium
+              ? null
+              : () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const PaywallScreen()),
+                  );
+                },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+            decoration: BoxDecoration(
+              color: backgroundColor,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: isPremium
+                    ? colorScheme
+                          .tertiaryContainer // Was 0xFFFFD54F
+                    : Colors.grey.shade300,
+                width: 0.5,
               ),
             ),
-          ],
-        ),
-      ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (icon != null) ...[
+                  Icon(icon, size: 10, color: textColor),
+                  const SizedBox(width: 2),
+                ],
+                Text(
+                  isPremium ? 'PRO' : 'FREE',
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                    color: textColor,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -474,26 +408,22 @@ class _AiStudioButton extends StatelessWidget {
 
   const _AiStudioButton({required this.onTap});
 
-  // Purple theme for AI Studio
-  static const _purpleAccent = Color(0xFF9C27B0);
-  static const _purpleLight = Color(0xFFF3E5F5);
-  static const _purpleBorder = Color(0xFFCE93D8);
-
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final aiColors = Theme.of(context).extension<AiStudioColors>()!;
 
     return _TappableButton(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: _purpleLight,
+          color: aiColors.background,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: _purpleBorder, width: 1),
+          border: Border.all(color: aiColors.border, width: 1),
           boxShadow: [
             BoxShadow(
-              color: _purpleAccent.withValues(alpha: 0.15),
+              color: aiColors.primary.withValues(alpha: 0.15),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -502,12 +432,12 @@ class _AiStudioButton extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.auto_awesome, size: 16, color: _purpleAccent),
+            Icon(Icons.auto_awesome, size: 16, color: aiColors.primary),
             const SizedBox(width: 6),
             Text(
               'AI Studio',
               style: textTheme.labelSmall?.copyWith(
-                color: _purpleAccent,
+                color: aiColors.primary,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -515,7 +445,7 @@ class _AiStudioButton extends StatelessWidget {
             Icon(
               Icons.arrow_forward_ios,
               size: 10,
-              color: _purpleAccent.withValues(alpha: 0.7),
+              color: aiColors.primary.withValues(alpha: 0.7),
             ),
           ],
         ),
@@ -543,19 +473,23 @@ class _CategoryCard extends StatelessWidget {
     final gameColors =
         Theme.of(context).extension<GameScreenColors>() ??
         GameScreenColors.light;
+    final colorScheme = Theme.of(context).colorScheme;
+
     final selectedCategory = selectedCategories.isEmpty
         ? 'None'
         : selectedCategories.first;
     final icon = _categoryIcons[selectedCategory] ?? Icons.category;
-    final blueAccent = Theme.of(context).colorScheme.primary;
-    final softBlue = blueAccent.withValues(alpha: 0.1);
+
+    // Using Brand Primary (Purple) to replace Blue Accent
+    final brandAccent = colorScheme.primary;
+    final softAccent = brandAccent.withValues(alpha: 0.1);
 
     return _TappableButton(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Colors.white, // Reverted to white for contrast
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
@@ -571,10 +505,10 @@ class _CategoryCard extends StatelessWidget {
               width: 64,
               height: 64,
               decoration: BoxDecoration(
-                color: softBlue,
+                color: softAccent, // Was softBlue
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: Icon(icon, size: 36, color: blueAccent),
+              child: Icon(icon, size: 36, color: brandAccent), // Was blueAccent
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -612,7 +546,7 @@ class _CategoryCard extends StatelessWidget {
                     'Change category...',
                     style: textTheme.labelSmall?.copyWith(
                       fontWeight: FontWeight.w600,
-                      color: blueAccent,
+                      color: brandAccent, // Was blueAccent
                     ),
                   ),
                 ],
@@ -622,12 +556,16 @@ class _CategoryCard extends StatelessWidget {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: Colors.grey.shade50,
+                color: Theme.of(
+                  context,
+                ).colorScheme.surfaceContainer, // Use new softSurface TOKEN
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Icon(
                 Icons.chevron_right,
-                color: Colors.grey.shade300,
+                color: colorScheme.outline.withValues(
+                  alpha: 0.5,
+                ), // Was Colors.grey.shade300
                 size: 24,
               ),
             ),
@@ -644,7 +582,9 @@ class _PlayerCountTag extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final primaryColor = Theme.of(context).colorScheme.primary;
+    final primaryColor = Theme.of(
+      context,
+    ).colorScheme.primary; // Was colorScheme.primary
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -675,20 +615,33 @@ class _PlayerList extends StatelessWidget {
         Theme.of(context).extension<GameScreenColors>() ??
         GameScreenColors.light;
 
-    // 6 distinct pastel colors for player avatars
-    const avatarColors = [
-      Color(0xFFFFE4E4), // Soft pink
-      Color(0xFFE3F2FD), // Soft blue
-      Color(0xFFE8F5E9), // Soft green
-      Color(0xFFFFF3E0), // Soft orange
-      Color(0xFFEDE7F6), // Soft purple
-      Color(0xFFFFFDE7), // Soft yellow
+    final pastelTheme = Theme.of(context).extension<PastelTheme>()!;
+
+    // 6 distinct pastel colors for player avatars from PastelTheme
+    final avatarColors = [
+      pastelTheme.pastelPink, // Soft pink
+      pastelTheme.pastelBlue, // Soft blue
+      pastelTheme.pastelGreen, // Soft green
+      pastelTheme.pastelPeach, // Was pastelOrange
+      pastelTheme.pastelLavender, // Was pastelPurple
+      pastelTheme.pastelYellow, // Soft yellow (fallback)
+    ];
+
+    const animalAssets = [
+      'assets/images/octopus.png',
+      'assets/images/otter.png',
+      'assets/images/penguin2.png',
+      'assets/images/sharksplash.png',
+      //'assets/images/turtle.png',
+      'assets/images/lobster.png',
+      'assets/images/polarbear.png',
     ];
 
     return Column(
       children: [
         ...List.generate(viewModel.settings.playerCount, (index) {
           final bgColor = avatarColors[index % avatarColors.length];
+          final animalAsset = animalAssets[index % animalAssets.length];
 
           return Container(
             margin: const EdgeInsets.only(bottom: 12),
@@ -706,17 +659,16 @@ class _PlayerList extends StatelessWidget {
             ),
             child: Row(
               children: [
-                Container(
+                SizedBox(
                   width: 48,
                   height: 48,
-                  decoration: BoxDecoration(
-                    color: bgColor,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Icon(
-                    Icons.person,
-                    color: gameColors.cardFrontTextDark.withValues(alpha: 0.6),
-                    size: 28,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: bgColor,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Image.asset(animalAsset, fit: BoxFit.contain),
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -795,9 +747,12 @@ class _ImposterSlider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final customColors = Theme.of(context).extension<CustomColors>()!;
     // Red/pink theme for Imposters section
-    const imposterRed = Color(0xFFE91E63);
-    const imposterPink = Color(0xFFFFE4EC);
+    final imposterRed = customColors.warn; // Was 0xFFE91E63 (Pink) -> RedAccent
+    final imposterPink = customColors.warn!.withValues(
+      alpha: 0.1,
+    ); // Was 0xFFFFE4EC -> RedAccent 10%
     final isRandom = viewModel.settings.randomizeImposters;
     final maxImposters = viewModel.settings.playerCount;
 
@@ -868,8 +823,12 @@ class _ImposterSlider extends StatelessWidget {
                 data: SliderTheme.of(context).copyWith(
                   trackHeight: 8,
                   // Blue track as shown in reference
-                  activeTrackColor: Theme.of(context).colorScheme.primary,
-                  inactiveTrackColor: Colors.grey.shade200,
+                  activeTrackColor: Theme.of(
+                    context,
+                  ).colorScheme.primary, // Was colorScheme.primary
+                  inactiveTrackColor: Theme.of(
+                    context,
+                  ).colorScheme.surfaceContainer, // Use new softSurface TOKEN
                   thumbColor: Theme.of(context).colorScheme.primary,
                   thumbShape: const RoundSliderThumbShape(
                     enabledThumbRadius: 10,
@@ -928,7 +887,9 @@ class _GameRulesSection extends StatelessWidget {
     final gameColors =
         Theme.of(context).extension<GameScreenColors>() ??
         GameScreenColors.light;
-    final secondaryColor = Theme.of(context).colorScheme.secondary;
+    final secondaryColor = Theme.of(
+      context,
+    ).colorScheme.secondary; // Was colorScheme.secondary
 
     return Column(
       children: [
@@ -1014,7 +975,9 @@ class _ToggleCard extends StatelessWidget {
                 Text(
                   description,
                   style: textTheme.labelSmall?.copyWith(
-                    color: Colors.grey.shade400,
+                    color: Theme.of(context).colorScheme.outline.withValues(
+                      alpha: 0.7,
+                    ), // Was Colors.grey.shade400
                   ),
                 ),
               ],
@@ -1027,7 +990,11 @@ class _ToggleCard extends StatelessWidget {
               height: 28,
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
-                color: isEnabled ? activeColor : Colors.grey.shade200,
+                color: isEnabled
+                    ? activeColor
+                    : Theme.of(context)
+                          .colorScheme
+                          .surfaceContainer, // Use new softSurface TOKEN
                 borderRadius: BorderRadius.circular(14),
               ),
               child: AnimatedAlign(
@@ -1039,7 +1006,9 @@ class _ToggleCard extends StatelessWidget {
                   width: 20,
                   height: 20,
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.surface, // Was Colors.white
                     borderRadius: BorderRadius.circular(10),
                     boxShadow: [
                       BoxShadow(
@@ -1090,12 +1059,16 @@ class _DiscussionTimeSection extends StatelessWidget {
             height: 56,
             decoration: BoxDecoration(
               // Yellow/orange theme for timer (matching reference)
-              color: const Color(0xFFFFF3E0),
+              color: Theme.of(context).colorScheme.tertiaryContainer.withValues(
+                alpha: 0.1,
+              ), // Was 0xFFFFF3E0
               borderRadius: BorderRadius.circular(16),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.timer_outlined,
-              color: Color(0xFFF9A825), // Amber/orange
+              color: Theme.of(
+                context,
+              ).colorScheme.tertiaryContainer, // Was 0xFFF9A825
               size: 28,
             ),
           ),
@@ -1174,10 +1147,18 @@ class _TimeButton extends StatelessWidget {
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: Colors.grey.shade50,
+          color: Theme.of(
+            context,
+          ).colorScheme.surfaceContainer, // Was Colors.grey.shade50
           borderRadius: BorderRadius.circular(20),
         ),
-        child: Icon(icon, color: Colors.grey.shade300, size: 20),
+        child: Icon(
+          icon,
+          color: Theme.of(context).colorScheme.outline.withValues(
+            alpha: 0.5,
+          ), // Was Colors.grey.shade300
+          size: 20,
+        ),
       ),
     );
   }
@@ -1191,7 +1172,9 @@ class _StartButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final iosBg = Theme.of(context).scaffoldBackgroundColor;
-    final primaryColor = Theme.of(context).colorScheme.primary;
+    final primaryColor = Theme.of(
+      context,
+    ).colorScheme.primary; // Was colorScheme.primary
 
     return Positioned(
       left: 0,
@@ -1320,11 +1303,145 @@ class _TappableButtonState extends State<_TappableButton>
       onTapCancel: _onTapCancel,
       onTap: widget.onTap,
       child: AnimatedBuilder(
-        animation: _scaleAnimation,
-        builder: (context, child) =>
-            Transform.scale(scale: _scaleAnimation.value, child: child),
-        child: widget.child,
-      ),
-    );
-  }
-}
+                animation: _scaleAnimation,
+                builder: (context, child) =>
+                    Transform.scale(scale: _scaleAnimation.value, child: child),
+                child: widget.child,
+              ),
+            );
+          }
+        }
+        
+        class _HowToPlayCard extends StatelessWidget {
+          const _HowToPlayCard();
+        
+            @override
+            Widget build(BuildContext context) {
+              final colorScheme = Theme.of(context).colorScheme;
+              final textTheme = Theme.of(context).textTheme;
+          
+              return Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(32),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.08),
+                      blurRadius: 40,
+                      offset: const Offset(0, 12),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'How to Play',
+                          style: textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: colorScheme.onSurface,
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          icon: Icon(Icons.close, color: colorScheme.outline),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    _buildStep(
+                      context,
+                      '1',
+                      'Setup',
+                      'Add players and choose a category.',
+                      colorScheme.primary,
+                    ),
+                    const SizedBox(height: 20),
+                    _buildStep(
+                      context,
+                      '2',
+                      'Pass the Phone',
+                      'Secrets revealed! Imposters get different words.',
+                      colorScheme.secondary,
+                    ),
+                    const SizedBox(height: 20),
+                    _buildStep(
+                      context,
+                      '3',
+                      'Discuss',
+                      'Describe your word without giving it away.',
+                      colorScheme.tertiary,
+                    ),
+                    const SizedBox(height: 20),
+                    _buildStep(
+                      context,
+                      '4',
+                      'Vote',
+                      'Eliminate the Imposter!',
+                      colorScheme.error,
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                ),
+              );
+            }
+                    Widget _buildStep(
+            BuildContext context,
+            String number,
+            String title,
+            String description,
+            Color color,
+          ) {
+            final textTheme = Theme.of(context).textTheme;
+        
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Center(
+                    child: Text(
+                      number,
+                      style: textTheme.labelMedium?.copyWith(
+                        color: color,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        description,
+                        style: textTheme.labelSmall?.copyWith(
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          }
+        }
+        

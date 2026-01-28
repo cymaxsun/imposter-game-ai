@@ -4,6 +4,10 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/subscription_service.dart';
 import '../services/usage_service.dart';
+import '../services/ad_service.dart';
+import '../utils/ui_utils.dart';
+import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
+import '../theme/app_theme.dart';
 import 'paywall_screen.dart';
 
 /// Screen for managing word categories and AI generation.
@@ -24,48 +28,75 @@ class AiCategoryStudioScreen extends StatefulWidget {
 class AiCategoryResult {
   /// Creates a result for a new AI-generated category.
   const AiCategoryResult({
-    required this.name,
-    required this.words,
-    required this.selectAfterSave,
+    this.name,
+    this.words,
+    this.selectAfterSave = false,
+    this.openGallery = false,
   });
 
   /// The category name.
-  final String name;
+  final String? name;
 
   /// The generated words for the category.
-  final List<String> words;
+  final List<String>? words;
 
   /// Whether the category should be selected after saving.
   final bool selectAfterSave;
+
+  /// Whether the user requested to open the gallery (manage categories).
+  final bool openGallery;
 }
 
 class _AiCategoryStudioScreenState extends State<AiCategoryStudioScreen> {
-  void _showLimitDialog(String title, String content) {
-    Future.delayed(Duration.zero, () {
-      if (!mounted) return;
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text(title),
-          content: Text(content),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('OK'),
-            ),
-            FilledButton(
-              onPressed: () {
-                Navigator.of(ctx).pop();
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const PaywallScreen()),
-                );
-              },
-              child: const Text('Upgrade'),
-            ),
-          ],
+  void _showAdOrPaywallDialog() {
+    AdaptiveAlertDialog.show(
+      context: context,
+      title: 'Out of Sparks',
+      message:
+          'You are out of sparks!\n\nWatch a short ad to get 1 more spark, or upgrade to Pro for unlimited access.',
+      actions: [
+        AlertAction(
+          title: 'Cancel',
+          style: AlertActionStyle.destructive,
+          onPressed: () {},
         ),
+        AlertAction(
+          title: 'View Plans',
+          style: AlertActionStyle.defaultAction,
+          onPressed: () {
+            Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const PaywallScreen()));
+          },
+        ),
+        AlertAction(
+          title: 'Watch Ad (+1 Spark)',
+          style: AlertActionStyle.primary,
+          onPressed: _showRewardedAd,
+        ),
+      ],
+    );
+  }
+
+  void _showRewardedAd() {
+    if (!AdService().isAdReady) {
+      showIosSnackBar(
+        context,
+        'Ad not ready yet. Please try again in a moment.',
+        isError: true,
       );
-    });
+      return;
+    }
+
+    AdService().showRewardedAd(
+      onUserEarnedReward: () {
+        UsageService().addSpark();
+        showIosSnackBar(
+          context,
+          'Spark added! You can now generate a category.',
+        );
+      },
+    );
   }
 
   bool _isLoading = false;
@@ -142,9 +173,18 @@ class _AiCategoryStudioScreenState extends State<AiCategoryStudioScreen> {
   }) {
     if (!UsageService().canSaveCategory && !SubscriptionService().isPremium) {
       // Fixed: added isPremium check
-      _showLimitDialog(
-        'Category Limit Reached',
-        'You can only save up to 20 categories with a free account.',
+      AdaptiveAlertDialog.show(
+        context: context,
+        title: 'Library Full',
+        message:
+            'You have reached the limit of ${UsageService().maxSavedCategories} saved categories.\n\nPlease delete an old category before saving this one.',
+        actions: [
+          AlertAction(
+            title: 'OK',
+            style: AlertActionStyle.primary,
+            onPressed: () {},
+          ),
+        ],
       );
       return;
     }
@@ -159,6 +199,7 @@ class _AiCategoryStudioScreenState extends State<AiCategoryStudioScreen> {
         name: name,
         words: words,
         selectAfterSave: selectAfterSave,
+        openGallery: true,
       ),
     );
   }
@@ -191,7 +232,7 @@ class _AiCategoryStudioScreenState extends State<AiCategoryStudioScreen> {
       ),
     );
 
-    if (action == null) return;
+    if (!mounted || action == null) return;
 
     switch (action) {
       case _AiResultAction.discard:
@@ -200,16 +241,12 @@ class _AiCategoryStudioScreenState extends State<AiCategoryStudioScreen> {
       case _AiResultAction.save:
         _addCategory(displayTopic, words, selectAfterSave: false);
         setState(() => _topicController.clear());
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Category "$displayTopic" saved!')),
-        );
+        showIosSnackBar(context, 'Category "$displayTopic" saved!');
         break;
       case _AiResultAction.useTheme:
         _addCategory(displayTopic, words, selectAfterSave: true);
         setState(() => _topicController.clear());
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Theme "$displayTopic" ready!')));
+        showIosSnackBar(context, 'Theme "$displayTopic" ready!');
         break;
     }
   }
@@ -221,11 +258,43 @@ class _AiCategoryStudioScreenState extends State<AiCategoryStudioScreen> {
       return;
     }
 
+    if (!UsageService().canSaveCategory && !SubscriptionService().isPremium) {
+      if (mounted) {
+        AdaptiveAlertDialog.show(
+          context: context,
+          title: 'Library Full',
+          message:
+              'You have reached the limit of ${UsageService().maxSavedCategories} saved categories.\n\nPlease delete an old category before generating a new one.',
+          actions: [
+            AlertAction(
+              title: 'Cancel',
+              style: AlertActionStyle.destructive,
+              onPressed: () {},
+            ),
+            /*
+             ### Finite Pro Sparks
+            - **Limit Implementation**: Updated `UsageService` to enforce a daily limit of **100 sparks** for Pro users. Sparks are now consumed for Pro users just like Free users, but with a significantly higher capacity.
+            - **Daily Refill**: Fixed the daily refill logic to ensure Pro users correctly refill to 100 sparks at the start of each day (EST).
+            - **UI Update**: Reverted the "Unlimited Sparks" text in the AI Studio. Pro users now see their actual spark count (e.g., "99 / 100"), maintaining transparency and consistency with the free version.
+            */
+            AlertAction(
+              title: 'Maybe Later',
+              style: AlertActionStyle.primary,
+              onPressed: () {
+                Navigator.of(
+                  context,
+                ).pop(const AiCategoryResult(openGallery: true));
+              },
+            ),
+          ],
+        );
+      }
+      return;
+    }
+
     if (!UsageService().canMakeRequest && !SubscriptionService().isPremium) {
       if (mounted) {
-        Navigator.of(
-          context,
-        ).push(MaterialPageRoute(builder: (context) => const PaywallScreen()));
+        _showAdOrPaywallDialog();
       }
       return;
     }
@@ -275,7 +344,7 @@ class _AiCategoryStudioScreenState extends State<AiCategoryStudioScreen> {
       });
       if (words.isNotEmpty) {
         // Increment usage count only on success
-        await UsageService().incrementRequestCount();
+        await UsageService().consumeSpark();
         await _showAiResultScreen(topic: topic, words: words);
       } else {
         await _showAiResultScreen(
@@ -314,7 +383,8 @@ class _AiCategoryStudioScreenState extends State<AiCategoryStudioScreen> {
       },
       child: Scaffold(
         appBar: AppBar(
-          backgroundColor: const Color(0xFFF8FAFC),
+          backgroundColor: colorScheme
+              .surface, // Was 0xFFF8FAFC (matches offWhiteBackground/surface)
           centerTitle: true,
           scrolledUnderElevation: 0,
           leadingWidth: 120,
@@ -348,9 +418,7 @@ class _AiCategoryStudioScreenState extends State<AiCategoryStudioScreen> {
                 tooltip: 'Reset Daily Limit (Debug)',
                 onPressed: () {
                   UsageService().resetDailyLimit();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Daily limit reset!')),
-                  );
+                  showIosSnackBar(context, 'Daily limit reset!');
                 },
               ),
             const SizedBox(width: 8),
@@ -375,14 +443,20 @@ class _AiCategoryStudioScreenState extends State<AiCategoryStudioScreen> {
                       style: TextStyle(
                         fontSize: 34,
                         fontWeight: FontWeight.w800,
-                        color: Color(0xFF2D3748),
+                        color: colorScheme.onSurface.withValues(
+                          alpha: 0.9,
+                        ), // Was 0xFF2D3748 (Slate 800) -> deepCharcoal is close enough
                         letterSpacing: -1.0,
                       ),
                     ),
                     SizedBox(height: 4),
                     Text(
                       'Describe a topic or theme to create a category.',
-                      style: TextStyle(fontSize: 14, color: Color(0xFF718096)),
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: colorScheme
+                            .outline, // Was 0xFF718096 (Slate 500) -> slateText
+                      ), // Was 0xFF718096 (Slate 500) -> slateText
                     ),
                     const SizedBox(height: 12),
                     Container(
@@ -391,30 +465,38 @@ class _AiCategoryStudioScreenState extends State<AiCategoryStudioScreen> {
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF6B5CE7).withValues(alpha: 0.1),
+                        color: colorScheme.primary.withValues(
+                          alpha: 0.1,
+                        ), // Was 0xFF6B5CE7
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: const Color(0xFF6B5CE7).withValues(alpha: 0.2),
+                          color: colorScheme.primary.withValues(
+                            alpha: 0.2,
+                          ), // Was 0xFF6B5CE7
                         ),
                       ),
                       child: ListenableBuilder(
-                        listenable: UsageService(),
+                        listenable: Listenable.merge([
+                          UsageService(),
+                          SubscriptionService(),
+                        ]),
                         builder: (context, child) {
+                          final isPremium = SubscriptionService().isPremium;
                           return Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(
-                                Icons.bolt,
+                              Icon(
+                                isPremium ? Icons.auto_awesome : Icons.bolt,
                                 size: 14,
-                                color: Color(0xFF6B5CE7),
+                                color: colorScheme.primary, // Was 0xFF6B5CE7
                               ),
                               const SizedBox(width: 6),
                               Text(
-                                'Daily Usage: ${UsageService().dailyRequestCount} / ${UsageService().maxDailyRequests}',
-                                style: const TextStyle(
+                                'Sparks: ${UsageService().remainingSparks} / ${UsageService().maxSparks}',
+                                style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.bold,
-                                  color: Color(0xFF6B5CE7),
+                                  color: colorScheme.primary, // Was 0xFF6B5CE7
                                 ),
                               ),
                             ],
@@ -448,9 +530,9 @@ class _AiCategoryStudioScreenState extends State<AiCategoryStudioScreen> {
                         textInputAction: TextInputAction.done,
                         controller: _topicController,
                         maxLines: 3,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
-                          color: Color(0xFF2D3748),
+                          color: colorScheme.onSurface, // Was 0xFF2D3748
                         ),
                         decoration: InputDecoration(
                           hintText:
@@ -503,15 +585,20 @@ class _AiCategoryStudioScreenState extends State<AiCategoryStudioScreen> {
                   width: double.infinity,
                   child: Container(
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF8B7CF6), Color(0xFF6B5CE7)],
+                      gradient: LinearGradient(
+                        colors: [
+                          colorScheme.secondary,
+                          colorScheme.primary,
+                        ], // Was 0xFF8B7CF6, 0xFF6B5CE7
                         begin: Alignment.centerLeft,
                         end: Alignment.centerRight,
                       ),
                       borderRadius: BorderRadius.circular(28),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF6B5CE7).withValues(alpha: 0.3),
+                          color: colorScheme.primary.withValues(
+                            alpha: 0.3,
+                          ), // Was 0xFF6B5CE7
                           blurRadius: 12,
                           offset: const Offset(0, 4),
                         ),
@@ -694,13 +781,10 @@ class _AiGenerationResultScreen extends StatefulWidget {
 }
 
 class _AiGenerationResultScreenState extends State<_AiGenerationResultScreen> {
-  static const _warmWhite = Color(0xFFFDFCFB);
-  static const _mintAccent = Color(0xFF10B981);
-  static const _charcoal = Color(0xFF334155);
-  static const _textSecondary = Color(0xFF64748B);
-  static const _lavenderAccent = Color(0xFFA78BFA);
-  static const _aiPurple = Color(0xFF6B5CE7);
-  static const double _actionFadeHeight = 40;
+  ColorScheme get _colorScheme => Theme.of(context).colorScheme;
+  CustomColors get _customColors =>
+      Theme.of(context).extension<CustomColors>()!;
+
   static const double _actionBarHeight = 52;
   static const double _actionBarPadding = 16;
 
@@ -723,13 +807,13 @@ class _AiGenerationResultScreenState extends State<_AiGenerationResultScreen> {
           return Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(
-              color: _warmWhite,
+              color: _colorScheme.surface,
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
               word,
-              style: const TextStyle(
-                color: _charcoal,
+              style: TextStyle(
+                color: _colorScheme.onSurface,
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
               ),
@@ -749,14 +833,14 @@ class _AiGenerationResultScreenState extends State<_AiGenerationResultScreen> {
       },
       child: Row(
         children: [
-          const Icon(Icons.info, color: _lavenderAccent),
+          Icon(Icons.info, color: _colorScheme.secondary),
           const SizedBox(width: 8),
-          const Expanded(
+          Expanded(
             child: Text(
               'You can edit the word list after adding it to your library.',
               style: TextStyle(
                 fontSize: 12,
-                color: _textSecondary,
+                color: _colorScheme.outline,
                 height: 1.4,
               ),
             ),
@@ -802,15 +886,19 @@ class _AiGenerationResultScreenState extends State<_AiGenerationResultScreen> {
             alignment: Alignment.centerLeft,
             child: Row(
               mainAxisSize: MainAxisSize.min,
-              children: const [
-                Icon(Icons.auto_awesome, size: 14, color: _lavenderAccent),
-                SizedBox(width: 6),
+              children: [
+                Icon(
+                  Icons.auto_awesome,
+                  size: 14,
+                  color: _colorScheme.secondary,
+                ),
+                const SizedBox(width: 6),
                 Text(
                   'THEME WORDS',
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
-                    color: _lavenderAccent,
+                    color: _colorScheme.secondary,
                     letterSpacing: 0.6,
                   ),
                 ),
@@ -821,8 +909,8 @@ class _AiGenerationResultScreenState extends State<_AiGenerationResultScreen> {
           if (hasError)
             Text(
               widget.errorMessage!,
-              style: const TextStyle(
-                color: _warmWhite,
+              style: TextStyle(
+                color: _colorScheme.surface,
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
               ),
@@ -885,7 +973,7 @@ class _AiGenerationResultScreenState extends State<_AiGenerationResultScreen> {
                               });
                             },
                             style: TextButton.styleFrom(
-                              foregroundColor: _aiPurple,
+                              foregroundColor: _colorScheme.primary,
                               minimumSize: const Size.fromHeight(44),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(18),
@@ -921,7 +1009,7 @@ class _AiGenerationResultScreenState extends State<_AiGenerationResultScreen> {
                         });
                       },
                       style: TextButton.styleFrom(
-                        foregroundColor: _aiPurple,
+                        foregroundColor: _colorScheme.primary,
                         minimumSize: const Size.fromHeight(44),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(18),
@@ -1064,9 +1152,9 @@ class _AiGenerationResultScreenState extends State<_AiGenerationResultScreen> {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      _warmWhite.withValues(alpha: 0),
-                      _warmWhite.withValues(alpha: 0.8),
-                      _warmWhite,
+                      _colorScheme.surface.withValues(alpha: 0),
+                      _colorScheme.surface.withValues(alpha: 0.8),
+                      _colorScheme.surface,
                     ],
                     stops: const [0.0, 0.55, 1.0],
                   ),
@@ -1097,10 +1185,13 @@ class _AiGenerationResultScreenState extends State<_AiGenerationResultScreen> {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(18),
                           ),
-                          backgroundColor: _mintAccent,
+                          backgroundColor:
+                              _customColors.succeed, // Was _mintAccent
                           foregroundColor: Colors.white,
                           elevation: 6,
-                          shadowColor: _mintAccent.withValues(alpha: 0.35),
+                          shadowColor: _customColors.succeed!.withValues(
+                            alpha: 0.35,
+                          ),
                         ),
                         icon: const Icon(Icons.bookmark_add_rounded, size: 18),
                         label: const Text(
@@ -1149,8 +1240,8 @@ class _AiGenerationResultScreenState extends State<_AiGenerationResultScreen> {
         widget.errorMessage != null && widget.errorMessage!.isNotEmpty;
 
     final cardBackground = Color.alphaBlend(
-      _lavenderAccent.withValues(alpha: 0.2),
-      _warmWhite,
+      _colorScheme.secondary.withValues(alpha: 0.2), // Was _lavenderAccent
+      _colorScheme.surface, // Was _warmWhite
     );
 
     final bottomInset = MediaQuery.of(context).padding.bottom;
@@ -1158,10 +1249,10 @@ class _AiGenerationResultScreenState extends State<_AiGenerationResultScreen> {
         _actionBarHeight + _actionBarPadding + bottomInset + 16;
 
     return Scaffold(
-      backgroundColor: _warmWhite,
+      backgroundColor: _colorScheme.surface,
       appBar: AppBar(
         centerTitle: true,
-        backgroundColor: _warmWhite.withValues(alpha: 0.9),
+        backgroundColor: _colorScheme.surface.withValues(alpha: 0.9),
         scrolledUnderElevation: 0,
         elevation: 0,
         leading: IconButton(

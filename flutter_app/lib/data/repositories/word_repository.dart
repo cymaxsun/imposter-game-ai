@@ -134,6 +134,33 @@ class WordRepository {
     _persistSafely();
   }
 
+  /// Renames a category while preserving its position in the list.
+  void renameCategory(String oldName, String newName, List<String> words) {
+    if (_customCategoryLists.containsKey(oldName)) {
+      // Rebuild map to preserve order
+      final newMap = <String, List<String>>{};
+      for (final key in _customCategoryLists.keys) {
+        if (key == oldName) {
+          newMap[newName] = List.from(words);
+        } else {
+          newMap[key] = _customCategoryLists[key]!;
+        }
+      }
+      _customCategoryLists
+        ..clear()
+        ..addAll(newMap);
+    } else {
+      // If it's a default category or from elsewhere, just add/hide as needed
+      if (_defaultCategoryLists.containsKey(oldName)) {
+        _hiddenDefaultCategories.add(oldName);
+      }
+      _customCategoryLists[newName] = List.from(words);
+    }
+    _persistSafely();
+  }
+
+  /// Deletes a category.
+
   /// Deletes a category.
   void deleteCategory(String name) {
     if (_customCategoryLists.containsKey(name)) {

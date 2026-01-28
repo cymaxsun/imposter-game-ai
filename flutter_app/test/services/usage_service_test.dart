@@ -10,48 +10,62 @@ void main() {
       tz.initializeTimeZones();
     });
 
-    test('Initializes with 0 requests', () async {
+    test('Initializes with max sparks', () async {
       final service = UsageService();
       await service.init();
-      expect(service.dailyRequestCount, 0);
+      expect(service.remainingSparks, 3);
       expect(service.canMakeRequest, true);
     });
 
-    test('Increments request count correctly', () async {
+    test('Consumes sparks correctly', () async {
       final service = UsageService();
       await service.init();
 
-      await service.incrementRequestCount();
-      expect(service.dailyRequestCount, 1);
-
-      // Persists
-      final prefs = await SharedPreferences.getInstance();
-      expect(prefs.getInt('daily_request_count'), 1);
+      await service.consumeSpark();
+      expect(service.remainingSparks, 2);
     });
 
-    test('Enforces max daily requests', () async {
+    test('Enforces spark usage', () async {
       final service = UsageService();
       await service.init();
 
-      // Exhaust limit
-      for (var i = 0; i < 10; i++) {
-        await service.incrementRequestCount();
-      }
+      // Exhaust sparks
+      await service.consumeSpark(); // 2
+      await service.consumeSpark(); // 1
+      await service.consumeSpark(); // 0
 
-      expect(service.dailyRequestCount, 10);
+      expect(service.remainingSparks, 0);
       expect(service.canMakeRequest, false);
 
       // Try one more
-      await service.incrementRequestCount();
-      expect(service.dailyRequestCount, 10); // Should not increase
+      await service.consumeSpark();
+      expect(service.remainingSparks, 0); // Should not go negative
+    });
+
+    test('Adds sparks correctly with cap', () async {
+      final service = UsageService();
+      await service.init();
+
+      // Start full
+      expect(service.remainingSparks, 3);
+      await service.addSpark();
+      expect(service.remainingSparks, 3); // Cap enforced
+
+      // Consume one
+      await service.consumeSpark(); // 2
+      expect(service.remainingSparks, 2);
+
+      // Add back
+      await service.addSpark(); // 3
+      expect(service.remainingSparks, 3);
     });
 
     test('Saved category limit logic', () {
       final service = UsageService();
-      service.updateSavedCategoryCount(19);
+      service.updateSavedCategoryCount(4);
       expect(service.canSaveCategory, true);
 
-      service.updateSavedCategoryCount(20);
+      service.updateSavedCategoryCount(5);
       expect(service.canSaveCategory, false);
     });
   });
