@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
 
-import 'package:flutter/widget_previews.dart';
 import 'package:auto_size_text/auto_size_text.dart';
 import '../theme/app_theme.dart';
 
@@ -72,6 +71,7 @@ class GameScreenConstants {
 class GameScreen extends StatefulWidget {
   final int playerCount;
   final List<String> playerNames;
+  final List<String> playerAvatars;
   final List<String> words;
   final Map<String, String> categoryMap;
   final int timeLimitSeconds;
@@ -83,6 +83,7 @@ class GameScreen extends StatefulWidget {
     super.key,
     required this.playerCount,
     required this.playerNames,
+    required this.playerAvatars,
     required this.imposterCountSetting,
     required this.useDecoyWord,
     required this.showImposterHints,
@@ -239,6 +240,8 @@ class _GameScreenState extends State<GameScreen>
         imposterNames: _imposterIndices
             .map((i) => widget.playerNames[i])
             .toList(),
+        allPlayerNames: widget.playerNames,
+        playerAvatars: widget.playerAvatars,
         secretWord: _secretWord,
         category: widget.categoryMap[_secretWord],
         decoyWord: _useDecoyWord ? _decoyWord : null,
@@ -264,6 +267,7 @@ class _GameScreenState extends State<GameScreen>
                 animation: _animation,
                 isFront: _isFront,
                 playerName: widget.playerNames[_currentPlayerIndex],
+                playerAvatar: widget.playerAvatars[_currentPlayerIndex],
                 isImposter: _playerRoles[_currentPlayerIndex] == 1,
                 secretWord: _secretWord,
                 decoyWord: _useDecoyWord ? _decoyWord : null,
@@ -325,6 +329,7 @@ class _RoleCard extends StatelessWidget {
   final Animation<double> animation;
   final bool isFront;
   final String playerName;
+  final String playerAvatar;
   final bool isImposter;
   final String secretWord;
   final String? decoyWord;
@@ -335,6 +340,7 @@ class _RoleCard extends StatelessWidget {
     required this.animation,
     required this.isFront,
     required this.playerName,
+    required this.playerAvatar,
     required this.isImposter,
     required this.secretWord,
     this.decoyWord,
@@ -368,6 +374,7 @@ class _RoleCard extends StatelessWidget {
                       transform: Matrix4.identity()..rotateY(pi),
                       alignment: Alignment.center,
                       child: _CardBack(
+                        playerAvatar: playerAvatar,
                         isImposter: isImposter,
                         secretWord: secretWord,
                         decoyWord: decoyWord,
@@ -484,7 +491,6 @@ class _CardFrontState extends State<_CardFront>
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
     final gameColors =
         Theme.of(context).extension<GameScreenColors>() ??
         GameScreenColors.light;
@@ -555,102 +561,11 @@ class _CardFrontState extends State<_CardFront>
                   FractionallySizedBox(
                     widthFactor: 0.65,
                     heightFactor: 0.65,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Expanded(
-                          flex: 6,
-                          child: FittedBox(
-                            child: Container(
-                              padding: const EdgeInsets.all(24),
-                              decoration: BoxDecoration(
-                                color: primaryNavy.withValues(alpha: 0.15),
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                Icons.question_mark_rounded,
-                                size: GameScreenConstants.questionMarkIconSize,
-                                color: primaryNavy,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Expanded(
-                          flex: 2,
-                          child: FittedBox(
-                            child: Text(
-                              'SECRET',
-                              style: textTheme.titleLarge?.copyWith(
-                                fontWeight: FontWeight.w900,
-                                color: textDark,
-                                letterSpacing: 6,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Expanded(
-                          flex: 0,
-                          child: FittedBox(
-                            child: Text(
-                              'Pass the phone to',
-                              style: textTheme.labelSmall?.copyWith(
-                                color: textMuted,
-                                fontWeight: FontWeight.w300,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Expanded(
-                          flex: 2,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: primaryNavy.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(25),
-                            ),
-                            child: FractionallySizedBox(
-                              widthFactor: 0.6,
-                              heightFactor: 0.6,
-                              child: FittedBox(
-                                child: Text(
-                                  widget.playerName.toUpperCase(),
-                                  style: textTheme.bodyMedium?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: textDark,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Expanded(
-                          flex: 1,
-                          child: FittedBox(
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.touch_app,
-                                  size: GameScreenConstants.touchIconSize,
-                                  color: textMuted,
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'TAP TO REVEAL',
-                                  style: textTheme.labelSmall?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: textMuted,
-                                    letterSpacing: 2,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
+                    child: _SecretCardContent(
+                      playerName: widget.playerName,
+                      primaryNavy: primaryNavy,
+                      textDark: textDark,
+                      textMuted: textMuted,
                     ),
                   ),
                 ],
@@ -663,13 +578,132 @@ class _CardFrontState extends State<_CardFront>
   }
 }
 
+class _SecretCardContent extends StatelessWidget {
+  final String playerName;
+  final Color primaryNavy;
+  final Color textDark;
+  final Color textMuted;
+
+  const _SecretCardContent({
+    required this.playerName,
+    required this.primaryNavy,
+    required this.textDark,
+    required this.textMuted,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Expanded(
+          flex: 6,
+          child: FittedBox(
+            child: Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: primaryNavy.withValues(alpha: 0.15),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.question_mark_rounded,
+                size: GameScreenConstants.questionMarkIconSize,
+                color: primaryNavy,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Expanded(
+          flex: 2,
+          child: FittedBox(
+            child: Text(
+              'SECRET',
+              style: textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w900,
+                color: textDark,
+                letterSpacing: 6,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Expanded(
+          flex: 0,
+          child: FittedBox(
+            child: Text(
+              'Pass the phone to',
+              style: textTheme.labelSmall?.copyWith(
+                color: textMuted,
+                fontWeight: FontWeight.w300,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Expanded(
+          flex: 2,
+          child: Container(
+            decoration: BoxDecoration(
+              color: primaryNavy.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(25),
+            ),
+            child: FractionallySizedBox(
+              widthFactor: 0.6,
+              heightFactor: 0.6,
+              child: FittedBox(
+                child: Text(
+                  playerName.toUpperCase(),
+                  style: textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: textDark,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Expanded(
+          flex: 1,
+          child: FittedBox(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.touch_app,
+                  size: GameScreenConstants.touchIconSize,
+                  color: textMuted,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'TAP TO REVEAL',
+                  style: textTheme.labelSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: textMuted,
+                    letterSpacing: 2,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _CardBack extends StatelessWidget {
+  final String playerAvatar;
   final bool isImposter;
   final String secretWord;
   final String? decoyWord;
   final String? hint;
 
   const _CardBack({
+    required this.playerAvatar,
     required this.isImposter,
     required this.secretWord,
     this.decoyWord,
@@ -722,47 +756,22 @@ class _CardBack extends StatelessWidget {
         child: Stack(
           alignment: Alignment.center,
           children: [
-            Positioned.fill(
-              child: FittedBox(
-                fit: BoxFit.contain,
-                child: Transform.rotate(
-                  angle: showingAsImposter ? -0.2 : 0.2,
-                  child: Icon(
-                    showingAsImposter
-                        ? Icons.theater_comedy
-                        : Icons.verified_user,
-                    size: 200,
-                    color: accentColor.withValues(alpha: 0.05),
-                  ),
-                ),
-              ),
-            ),
             FractionallySizedBox(
-              heightFactor: 0.7,
-              widthFactor: 0.7,
+              heightFactor: 0.8,
+              widthFactor: 0.8,
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Expanded(
-                    flex: 3,
+                    flex: 6,
                     child: FittedBox(
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: accentColor.withValues(alpha: 0.1),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          showingAsImposter
-                              ? Icons.sentiment_very_dissatisfied
-                              : Icons.sentiment_very_satisfied,
-                          size: 40,
-                          color: accentColor,
-                        ),
+                      child: Transform.scale(
+                        scale: 1.5, // Zoom in to crop baked-in padding
+                        child: Image.asset(playerAvatar, fit: BoxFit.contain),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
                   Expanded(
                     flex: 2,
                     child: FittedBox(
@@ -776,23 +785,7 @@ class _CardBack extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Expanded(
-                    flex: 0,
-                    child: FittedBox(
-                      child: Text(
-                        showingAsImposter
-                            ? 'YOU ARE THE DECEIVER'
-                            : 'You belong here',
-                        style: textTheme.labelSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: mutedColor,
-                          letterSpacing: 3,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 8),
                   if (!showingAsImposter || hint != null)
                     Expanded(
                       flex: 4,
@@ -864,9 +857,9 @@ class _CardBack extends StatelessWidget {
                           ),
                         ),
                       ),
-                    )
-                  else
-                    const Spacer(flex: 2),
+                    ),
+                  //else
+                  //const Spacer(flex: 4),
                 ],
               ),
             ),
@@ -883,6 +876,8 @@ class _DiscussionView extends StatefulWidget {
   final bool imposterRevealed;
   final List<int> imposterIndices;
   final List<String> imposterNames;
+  final List<String> allPlayerNames;
+  final List<String> playerAvatars;
   final String secretWord;
   final String? category;
   final String? decoyWord;
@@ -895,6 +890,8 @@ class _DiscussionView extends StatefulWidget {
     required this.imposterRevealed,
     required this.imposterIndices,
     required this.imposterNames,
+    required this.allPlayerNames,
+    required this.playerAvatars,
     required this.secretWord,
     this.category,
     this.decoyWord,
@@ -910,6 +907,7 @@ class _DiscussionViewState extends State<_DiscussionView>
     with SingleTickerProviderStateMixin {
   late AnimationController _revealController;
   late Animation<double> _revealAnimation;
+  late String _startingPlayer;
 
   @override
   void initState() {
@@ -922,6 +920,9 @@ class _DiscussionViewState extends State<_DiscussionView>
       parent: _revealController,
       curve: Curves.easeOutBack,
     );
+
+    _startingPlayer =
+        widget.allPlayerNames[Random().nextInt(widget.allPlayerNames.length)];
 
     if (widget.imposterRevealed) {
       _revealController.forward();
@@ -975,11 +976,13 @@ class _DiscussionViewState extends State<_DiscussionView>
                     ? _ImposterRevealView(
                         animation: _revealAnimation,
                         imposterNames: widget.imposterNames,
+                        imposterIndices: widget.imposterIndices,
+                        playerAvatars: widget.playerAvatars,
                         secretWord: widget.secretWord,
                         category: widget.category,
                         onEndGame: widget.onEndGame,
                       )
-                    : const _WhoIsTheImposterSection(),
+                    : _WhoIsTheImposterSection(startingPlayer: _startingPlayer),
               ),
               if (!widget.imposterRevealed)
                 _RevealButton(onReveal: widget.onReveal),
@@ -1085,6 +1088,8 @@ class _TimerSection extends StatelessWidget {
 class _ImposterRevealView extends StatelessWidget {
   final Animation<double> animation;
   final List<String> imposterNames;
+  final List<int> imposterIndices;
+  final List<String> playerAvatars;
   final String secretWord;
   final String? category;
   final VoidCallback onEndGame;
@@ -1092,6 +1097,8 @@ class _ImposterRevealView extends StatelessWidget {
   const _ImposterRevealView({
     required this.animation,
     required this.imposterNames,
+    required this.imposterIndices,
+    required this.playerAvatars,
     required this.secretWord,
     this.category,
     required this.onEndGame,
@@ -1105,53 +1112,36 @@ class _ImposterRevealView extends StatelessWidget {
           child: AnimatedBuilder(
             animation: animation,
             builder: (context, child) {
-              return Center(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.only(
-                    bottom: GameScreenConstants.scrollBottomPadding,
-                  ),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.08),
-                          blurRadius: 20,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
+              return Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.08),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
                     ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _RevealTitle(
-                          namesCount: imposterNames.length,
-                          animation: animation,
-                        ),
-                        const SizedBox(height: 24),
-                        ...imposterNames.asMap().entries.map(
-                          (entry) => _ImposterNameCard(
-                            index: entry.key,
-                            name: entry.value,
-                            animation: animation,
-                            total: imposterNames.length,
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        _RevealDivider(animation: animation),
-                        const SizedBox(height: 16),
-                        _RevealSecretInfo(
-                          secretWord: secretWord,
-                          category: category,
-                          animation: animation,
-                        ),
-                      ],
-                    ),
-                  ),
+                  ],
                 ),
+                child: imposterNames.length == 1
+                    ? _SingleImposterLayout(
+                        name: imposterNames.first,
+                        avatar: playerAvatars[imposterIndices.first],
+                        secretWord: secretWord,
+                        category: category,
+                        animation: animation,
+                      )
+                    : _MultiImposterLayout(
+                        imposterNames: imposterNames,
+                        imposterIndices: imposterIndices,
+                        playerAvatars: playerAvatars,
+                        secretWord: secretWord,
+                        category: category,
+                        animation: animation,
+                      ),
               );
             },
           ),
@@ -1162,11 +1152,123 @@ class _ImposterRevealView extends StatelessWidget {
   }
 }
 
+class _SingleImposterLayout extends StatelessWidget {
+  final String name;
+  final String avatar;
+  final String secretWord;
+  final String? category;
+  final Animation<double> animation;
+
+  const _SingleImposterLayout({
+    required this.name,
+    required this.avatar,
+    required this.secretWord,
+    this.category,
+    required this.animation,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _RevealTitle(namesCount: 1, animation: animation, isExpanded: true),
+        Expanded(
+          flex: 5,
+          child: _SingleImposterCard(
+            name: name,
+            avatar: avatar,
+            animation: animation,
+          ),
+        ),
+        const SizedBox(height: 16),
+        _RevealDivider(animation: animation),
+        const SizedBox(height: 16),
+        _RevealSecretInfo(
+          secretWord: secretWord,
+          category: category,
+          animation: animation,
+          isExpanded: true,
+        ),
+        const SizedBox(height: GameScreenConstants.scrollBottomPadding),
+      ],
+    );
+  }
+}
+
+class _MultiImposterLayout extends StatelessWidget {
+  final List<String> imposterNames;
+  final List<int> imposterIndices;
+  final List<String> playerAvatars;
+  final String secretWord;
+  final String? category;
+  final Animation<double> animation;
+
+  const _MultiImposterLayout({
+    required this.imposterNames,
+    required this.imposterIndices,
+    required this.playerAvatars,
+    required this.secretWord,
+    this.category,
+    required this.animation,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _RevealTitle(
+          namesCount: imposterNames.length,
+          animation: animation,
+          isExpanded: false,
+        ),
+        const SizedBox(height: 24),
+        Expanded(
+          flex: 5,
+          child: Center(
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: imposterNames.asMap().entries.map((entry) {
+                  return _ImposterNameCard(
+                    index: entry.key,
+                    name: entry.value,
+                    avatar: playerAvatars[imposterIndices[entry.key]],
+                    animation: animation,
+                    total: imposterNames.length,
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        _RevealDivider(animation: animation),
+        const SizedBox(height: 16),
+        _RevealSecretInfo(
+          secretWord: secretWord,
+          category: category,
+          animation: animation,
+          isExpanded: false,
+        ),
+        const SizedBox(height: GameScreenConstants.scrollBottomPadding),
+      ],
+    );
+  }
+}
+
 class _RevealTitle extends StatelessWidget {
   final int namesCount;
   final Animation<double> animation;
+  final bool isExpanded;
 
-  const _RevealTitle({required this.namesCount, required this.animation});
+  const _RevealTitle({
+    required this.namesCount,
+    required this.animation,
+    this.isExpanded = true,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1177,16 +1279,98 @@ class _RevealTitle extends StatelessWidget {
       curve: Curves.easeOut,
     ).transform(animation.value.clamp(0.0, 1.0)).clamp(0.0, 1.0);
 
+    final content = Opacity(
+      opacity: opacityValue,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8.0),
+        child: FittedBox(
+          fit: BoxFit.contain,
+          child: Text(
+            namesCount == 1 ? 'The Imposter\nwas...' : 'The Imposters\nwere...',
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: Theme.of(context).colorScheme.onSurface,
+              height: 1.1,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ),
+      ),
+    );
+
+    if (isExpanded) {
+      return Expanded(flex: 2, child: content);
+    }
+    return content;
+  }
+}
+
+class _SingleImposterCard extends StatelessWidget {
+  final String name;
+  final String avatar;
+  final Animation<double> animation;
+
+  const _SingleImposterCard({
+    required this.name,
+    required this.avatar,
+    required this.animation,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // Clamp opacity to avoid errors with curves that overshoot
+    final opacityValue = Interval(
+      0.2,
+      0.5,
+      curve: Curves.easeOut,
+    ).transform(animation.value.clamp(0.0, 1.0)).clamp(0.0, 1.0);
+
+    final scaleValue = Interval(
+      0.2,
+      0.6,
+      curve: Curves.elasticOut,
+    ).transform(animation.value.clamp(0.0, 1.0));
+
     return Opacity(
       opacity: opacityValue,
-      child: Text(
-        namesCount == 1 ? 'The Imposter\nwas...' : 'The Imposters\nwere...',
-        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-          fontWeight: FontWeight.bold,
-          color: Theme.of(context).colorScheme.onSurface,
-          height: 1.2,
+      child: Transform.scale(
+        scale: scaleValue,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              flex: 4,
+              child: ClipRect(
+                child: Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Transform.scale(
+                    scale: 1.4,
+                    child: Image.asset(avatar, fit: BoxFit.contain),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              flex: 1,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: FittedBox(
+                  fit: BoxFit.contain,
+                  child: Text(
+                    name,
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).colorScheme.onSurface,
+                      height: 1.1,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
-        textAlign: TextAlign.center,
       ),
     );
   }
@@ -1195,12 +1379,14 @@ class _RevealTitle extends StatelessWidget {
 class _ImposterNameCard extends StatelessWidget {
   final int index;
   final String name;
+  final String avatar;
   final Animation<double> animation;
   final int total;
 
   const _ImposterNameCard({
     required this.index,
     required this.name,
+    required this.avatar,
     required this.animation,
     required this.total,
   });
@@ -1235,26 +1421,28 @@ class _ImposterNameCard extends StatelessWidget {
           child: Row(
             children: [
               Container(
-                width: 36,
-                height: 36,
+                width: 48,
+                height: 48,
+                padding: const EdgeInsets.all(4),
                 decoration: const BoxDecoration(
                   color: Color(0xFFFFE0E0),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
-                  Icons.theater_comedy,
-                  color: Color(0xFFE53935),
-                  size: 18,
+                child: Transform.scale(
+                  scale: 1.2,
+                  child: Image.asset(avatar, fit: BoxFit.contain),
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: Text(
+                child: AutoSizeText(
                   name,
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: Theme.of(context).colorScheme.onSurface,
                   ),
+                  maxLines: 1,
+                  minFontSize: 10,
                 ),
               ),
             ],
@@ -1289,11 +1477,13 @@ class _RevealSecretInfo extends StatelessWidget {
   final String secretWord;
   final String? category;
   final Animation<double> animation;
+  final bool isExpanded;
 
   const _RevealSecretInfo({
     required this.secretWord,
     this.category,
     required this.animation,
+    this.isExpanded = true,
   });
 
   @override
@@ -1304,9 +1494,11 @@ class _RevealSecretInfo extends StatelessWidget {
       curve: Curves.easeOut,
     ).transform(animation.value.clamp(0.0, 1.0)).clamp(0.0, 1.0);
 
-    return Opacity(
+    final content = Opacity(
       opacity: opacityValue,
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _InfoRow(label: 'SECRET WORD', value: secretWord),
           if (category != null) ...[
@@ -1316,6 +1508,11 @@ class _RevealSecretInfo extends StatelessWidget {
         ],
       ),
     );
+
+    if (isExpanded) {
+      return Expanded(flex: 2, child: content);
+    }
+    return content;
   }
 }
 
@@ -1386,6 +1583,7 @@ class _InfoRow extends StatelessWidget {
         minFontSize: 6,
         overflow: TextOverflow.ellipsis,
         textAlign: isVertical ? TextAlign.center : TextAlign.end,
+        wrapWords: false,
       );
     }
 
@@ -1447,7 +1645,7 @@ class _PlayAgainButton extends StatelessWidget {
         child: FilledButton(
           onPressed: onEndGame,
           style: FilledButton.styleFrom(
-            backgroundColor: const Color(0xFF4CAF50),
+            backgroundColor: Theme.of(context).colorScheme.primary,
             minimumSize: const Size(double.infinity, 56),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(
@@ -1481,7 +1679,9 @@ class _PlayAgainButton extends StatelessWidget {
 }
 
 class _WhoIsTheImposterSection extends StatelessWidget {
-  const _WhoIsTheImposterSection();
+  final String startingPlayer;
+
+  const _WhoIsTheImposterSection({required this.startingPlayer});
 
   @override
   Widget build(BuildContext context) {
@@ -1508,6 +1708,24 @@ class _WhoIsTheImposterSection extends StatelessWidget {
                 style: textTheme.displayMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                   color: onSurface,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(30),
+                ),
+                child: Text(
+                  '$startingPlayer starts!',
+                  style: textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onPrimaryContainer,
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
@@ -1571,40 +1789,4 @@ class _RevealButton extends StatelessWidget {
       ),
     );
   }
-}
-
-// ============================================================================
-// Widget Previews
-// ============================================================================
-
-@Preview(name: 'Card Front', size: Size(400, 600))
-Widget cardFrontPreview() {
-  return const MaterialApp(
-    home: Scaffold(
-      backgroundColor: Color(0xFFF5F5F5),
-      body: Center(
-        child: SizedBox(
-          width: 350,
-          height: 500,
-          child: _CardFront(playerName: 'Alice'),
-        ),
-      ),
-    ),
-  );
-}
-
-@Preview(name: 'Card Back - Innocent', size: Size(400, 600))
-Widget cardBackInnocentPreview() {
-  return const MaterialApp(
-    home: Scaffold(
-      backgroundColor: Color(0xFFF5F5F5),
-      body: Center(
-        child: SizedBox(
-          width: 350,
-          height: 500,
-          child: _CardBack(isImposter: false, secretWord: 'BANANA'),
-        ),
-      ),
-    ),
-  );
 }
