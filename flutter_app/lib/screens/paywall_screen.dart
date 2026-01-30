@@ -100,46 +100,54 @@ class _PaywallScreenState extends State<PaywallScreen> {
                           constraints: BoxConstraints(
                             minHeight: constraints.maxHeight,
                           ),
-                          child: Padding(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: horizontalPadding,
-                              vertical: 16.0,
-                            ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const SizedBox(
-                                      height: 56,
-                                    ), // Spacer for fixed close button (32 + 24)
-                                    _OctoHero(
-                                      accentColor: octoLavender,
-                                      glowColor: softLavender,
-                                      starColor: golden,
-                                      inkColor: deepCharcoal,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  _OctoHero(
+                                    accentColor: octoLavender,
+                                    glowColor: softLavender,
+                                    starColor: golden,
+                                    inkColor: deepCharcoal,
+                                    backgroundColor: warmOffWhite,
+                                  ),
+                                  Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: horizontalPadding,
                                     ),
-                                    const SizedBox(height: 32),
-                                    AutoSizeText(
-                                      'Unlock Full Chaos!',
-                                      style: textTheme.headlineLarge?.copyWith(
-                                        fontWeight: FontWeight.w800,
-                                        fontSize: 22,
-                                      ),
-                                      maxLines: 1,
-                                      textAlign: TextAlign.center,
+                                    child: Column(
+                                      children: [
+                                        const SizedBox(height: 32),
+                                        AutoSizeText(
+                                          'Unlock Full Chaos!',
+                                          style: textTheme.headlineLarge
+                                              ?.copyWith(
+                                                fontWeight: FontWeight.w800,
+                                                fontSize: 22,
+                                              ),
+                                          maxLines: 1,
+                                          textAlign: TextAlign.center,
+                                        ),
+                                        const SizedBox(height: 32),
+                                        _FeatureList(
+                                          iconColor: primaryGreen,
+                                          textColor: deepCharcoal.withValues(
+                                            alpha: 0.8,
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                    const SizedBox(height: 32),
-                                    _FeatureList(
-                                      iconColor: primaryGreen,
-                                      textColor: deepCharcoal.withValues(
-                                        alpha: 0.8,
-                                      ),
-                                    ),
-                                  ],
+                                  ),
+                                ],
+                              ),
+                              Padding(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: horizontalPadding,
+                                  vertical: 16.0,
                                 ),
-                                Column(
+                                child: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     const SizedBox(height: 48), // Added spacing
@@ -321,8 +329,8 @@ class _PaywallScreenState extends State<PaywallScreen> {
                                     ],
                                   ],
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -586,31 +594,49 @@ class _OctoHero extends StatelessWidget {
     required this.glowColor,
     required this.starColor,
     required this.inkColor,
+    required this.backgroundColor,
   });
 
   final Color accentColor;
   final Color glowColor;
   final Color starColor;
   final Color inkColor;
+  final Color backgroundColor;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 200,
-      width: 200,
-      decoration: BoxDecoration(
-        color: glowColor.withValues(alpha: 0.3),
-        shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(color: glowColor.withValues(alpha: 0.5), blurRadius: 40),
+    return SizedBox(
+      height: 300,
+      width: double.infinity,
+      child: Stack(
+        children: [
+          Image.asset(
+            'assets/images/paywallsplash2.png',
+            width: double.infinity,
+            height: 300,
+            fit: BoxFit.cover,
+          ),
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: 120,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    backgroundColor.withValues(alpha: 0),
+                    backgroundColor.withValues(alpha: 0.6),
+                    backgroundColor,
+                  ],
+                  stops: const [0.0, 0.4, 1.0],
+                ),
+              ),
+            ),
+          ),
         ],
-      ),
-      child: Center(
-        child: Icon(
-          Icons.sentiment_satisfied_alt_rounded,
-          size: 100,
-          color: starColor,
-        ),
       ),
     );
   }

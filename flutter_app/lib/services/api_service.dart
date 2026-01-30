@@ -1,8 +1,8 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
-import 'package:meta/meta.dart';
 
 import 'attest_service.dart';
 import 'subscription_service.dart';
@@ -42,10 +42,10 @@ class ApiService {
   /// the lazy loading mechanism will handle retries later if this fails.
   static Future<void> warmUp() async {
     try {
-      print('[api_service] Warming up session token...');
+      debugPrint('[api_service] Warming up session token...');
       await _getSessionToken();
     } catch (e) {
-      print('[api_service] Warm-up failed (non-fatal): $e');
+      debugPrint('[api_service] Warm-up failed (non-fatal): $e');
     }
   }
 
@@ -62,7 +62,7 @@ class ApiService {
 
     if (!usage.canMakeRequest && !subscription.isPremium) {
       // In a real app we might throw a specific exception to show Paywall
-      print('Daily usage limit reached. Please upgrade to Premium.');
+      debugPrint('Daily usage limit reached. Please upgrade to Premium.');
       throw Exception('Daily usage limit reached. Please upgrade to Premium.');
     }
 
@@ -106,12 +106,12 @@ class ApiService {
       String token = await _getSessionToken();
 
       // 2. Make Request
-      print('[api_service] Making authenticated request...');
+      debugPrint('[api_service] Making authenticated request...');
       var response = await requestBuilder(token);
 
       // 3. Handle 401 (Auto-Renewal)
       if (response.statusCode == 401) {
-        print('[api_service] Token expired/invalid (401). Renewing session...');
+        debugPrint('[api_service] Token expired/invalid (401). Renewing session...');
         await _clearSession();
         token = await _performSecureHandshake(); // Force new handshake
         response = await requestBuilder(token); // Retry
@@ -128,10 +128,10 @@ class ApiService {
 
       // 5. Handle Other Errors
       final body = response.body;
-      print('[api_service] Request failed: ${response.statusCode} - $body');
+      debugPrint('[api_service] Request failed: ${response.statusCode} - $body');
       throw Exception('Request failed: ${response.statusCode} - $body');
     } catch (e, stack) {
-      print('[api_service] Error in authenticated request: $e\n$stack');
+      debugPrint('[api_service] Error in authenticated request: $e\n$stack');
       rethrow;
     }
   }
@@ -166,7 +166,7 @@ class ApiService {
   /// 3. Exchange Attestation for Session JWT.
   /// 4. Store JWT securely.
   static Future<String> _performSecureHandshake() async {
-    print('[api_service] Starting Secure Handshake...');
+    debugPrint('[api_service] Starting Secure Handshake...');
 
     if (!await AttestService.isSupported()) {
       throw Exception('Device integrity checks not supported on this device.');
@@ -209,7 +209,7 @@ class ApiService {
     await _storage.write(key: _sessionTokenKey, value: token);
     _currentSessionToken = token;
 
-    print('[api_service] Handshake successful. Session established.');
+    debugPrint('[api_service] Handshake successful. Session established.');
     return token;
   }
 
@@ -222,7 +222,7 @@ class ApiService {
       }
       return null;
     } catch (e) {
-      print('[api_service] Error fetching challenge: $e');
+      debugPrint('[api_service] Error fetching challenge: $e');
       return null;
     }
   }

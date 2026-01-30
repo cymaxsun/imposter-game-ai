@@ -69,7 +69,9 @@ class SubscriptionService extends ChangeNotifier {
         );
         debugPrint("Purchasing package: ${package.identifier}");
 
-        final PurchaseResult result = await Purchases.purchasePackage(package);
+        final PurchaseResult result = await Purchases.purchase(
+          PurchaseParams.package(package),
+        );
 
         _isPremium =
             result.customerInfo.entitlements.all[entitlementId]?.isActive ??

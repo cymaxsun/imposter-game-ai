@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -11,7 +12,6 @@ import 'ai_category_studio_screen.dart';
 import '../viewmodels/setup_view_model.dart';
 import 'category_gallery_screen.dart';
 import 'paywall_screen.dart';
-import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import '../services/subscription_service.dart';
 
 /// Stitch-inspired setup screen with pastel colors and friendly layout.
@@ -93,11 +93,36 @@ class _SetupScreenState extends State<SetupScreen> {
       imposterCount = Random().nextInt(max);
     }
 
+    const animalAssets = [
+      'assets/images/octopus.png',
+      'assets/images/otter.png',
+      'assets/images/penguin.png',
+      'assets/images/shark.png',
+      'assets/images/lobster.png',
+      'assets/images/polarbear.png',
+      'assets/images/penguin.png',
+    ];
+
+    final playerAvatars = List.generate(
+      _viewModel.settings.playerCount,
+      (index) => animalAssets[index % animalAssets.length],
+    );
+
+    // Build category icons map
+    final Map<String, String> categoryIcons = {};
+    for (final category in _viewModel.settings.selectedCategories) {
+      final icon = _viewModel.getCategoryIcon(category);
+      if (icon != null) {
+        categoryIcons[category] = icon;
+      }
+    }
+
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => GameScreen(
           playerCount: _viewModel.settings.playerCount,
           playerNames: _viewModel.settings.playerNames,
+          playerAvatars: playerAvatars,
           imposterCountSetting: imposterCount,
           useDecoyWord: _viewModel.settings.useDecoyWord,
           showImposterHints: _viewModel.settings.showImposterHints,
@@ -148,6 +173,7 @@ class _SetupScreenState extends State<SetupScreen> {
                             selectedCategories:
                                 _viewModel.settings.selectedCategories,
                             onTap: () => _navigateToCategoryGallery(context),
+                            getCategoryIcon: _viewModel.getCategoryIcon,
                           ),
                           const SizedBox(height: 32),
                           _SectionHeader(
@@ -214,13 +240,16 @@ class _SetupScreenState extends State<SetupScreen> {
               },
               onDelete: _viewModel.deleteCategory,
               categoryLists: _viewModel.categoryLists,
-              onCreate: (name, words) async {
-                _viewModel.addCategory(name, words);
+              onCreate: (name, words, {icon}) async {
+                _viewModel.addCategory(name, words, icon: icon);
               },
-              onEdit: (oldName, newName, words) async {
-                _viewModel.renameCategory(oldName, newName, words);
+              onEdit: (oldName, newName, words, {icon}) async {
+                _viewModel.renameCategory(oldName, newName, words, icon: icon);
               },
               onResult: _handleAiStudioResult,
+              getCategoryIcon: _viewModel.getCategoryIcon,
+              customIconPaths: _viewModel.customIconPaths,
+              onCustomIconAdded: _viewModel.addCustomIconPath,
             );
           },
         ),
@@ -457,6 +486,7 @@ class _AiStudioButton extends StatelessWidget {
 class _CategoryCard extends StatelessWidget {
   final Set<String> selectedCategories;
   final VoidCallback onTap;
+  final String? Function(String) getCategoryIcon;
 
   static const Map<String, IconData> _categoryIcons = {
     'Animals': Icons.pets,
@@ -465,7 +495,25 @@ class _CategoryCard extends StatelessWidget {
     'Emotions': Icons.emoji_emotions,
   };
 
-  const _CategoryCard({required this.selectedCategories, required this.onTap});
+  const _CategoryCard({
+    required this.selectedCategories,
+    required this.onTap,
+    required this.getCategoryIcon,
+  });
+
+  IconData _getIcon(String category) {
+    // Check for custom icon first
+    final iconString = getCategoryIcon(category);
+    if (iconString != null && iconString.startsWith('codePoint:')) {
+      try {
+        final codePoint = int.parse(iconString.split(':')[1]);
+        return IconData(codePoint, fontFamily: 'MaterialIcons');
+      } catch (_) {}
+    }
+    
+    // Fallback to default mapping or generic icon
+    return _categoryIcons[category] ?? Icons.category;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -478,7 +526,12 @@ class _CategoryCard extends StatelessWidget {
     final selectedCategory = selectedCategories.isEmpty
         ? 'None'
         : selectedCategories.first;
-    final icon = _categoryIcons[selectedCategory] ?? Icons.category;
+    
+    // Determine icon
+    final iconData = _getIcon(selectedCategory);
+    final iconString = getCategoryIcon(selectedCategory);
+    final isCustomImage = iconString != null && iconString.startsWith('path:');
+    final imagePath = isCustomImage ? iconString.substring(5) : null;
 
     // Using Brand Primary (Purple) to replace Blue Accent
     final brandAccent = colorScheme.primary;
@@ -508,7 +561,22 @@ class _CategoryCard extends StatelessWidget {
                 color: softAccent, // Was softBlue
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: Icon(icon, size: 36, color: brandAccent), // Was blueAccent
+              child: isCustomImage && imagePath != null
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: Image.file(
+                        File(imagePath), // Requires dart:io
+                        width: 64,
+                        height: 64,
+                        fit: BoxFit.cover,
+                         errorBuilder: (context, error, stackTrace) => Icon(
+                           Icons.broken_image,
+                           size: 36,
+                           color: brandAccent,
+                         ),
+                      ),
+                    )
+                  : Icon(iconData, size: 36, color: brandAccent), // Was blueAccent
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -630,9 +698,8 @@ class _PlayerList extends StatelessWidget {
     const animalAssets = [
       'assets/images/octopus.png',
       'assets/images/otter.png',
-      'assets/images/penguin2.png',
-      'assets/images/sharksplash.png',
-      //'assets/images/turtle.png',
+      'assets/images/penguin.png',
+      'assets/images/shark.png',
       'assets/images/lobster.png',
       'assets/images/polarbear.png',
     ];
@@ -668,7 +735,10 @@ class _PlayerList extends StatelessWidget {
                       color: bgColor,
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Image.asset(animalAsset, fit: BoxFit.contain),
+                    child: Transform.scale(
+                      scale: 1.3,
+                      child: Image.asset(animalAsset, fit: BoxFit.contain),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -887,9 +957,6 @@ class _GameRulesSection extends StatelessWidget {
     final gameColors =
         Theme.of(context).extension<GameScreenColors>() ??
         GameScreenColors.light;
-    final secondaryColor = Theme.of(
-      context,
-    ).colorScheme.secondary; // Was colorScheme.secondary
 
     return Column(
       children: [
@@ -898,7 +965,7 @@ class _GameRulesSection extends StatelessWidget {
           description: 'Let fate decide the imposter count',
           isEnabled: viewModel.settings.randomizeImposters,
           onToggle: viewModel.toggleRandomizeImposters,
-          activeColor: secondaryColor,
+          activeColor: Theme.of(context).colorScheme.primary,
           textMain: gameColors.cardFrontTextDark,
         ),
         const SizedBox(height: 12),
@@ -907,7 +974,7 @@ class _GameRulesSection extends StatelessWidget {
           description: "Everyone gets a word! Find the odd one(s) out!",
           isEnabled: viewModel.settings.useDecoyWord,
           onToggle: viewModel.toggleDecoyWord,
-          activeColor: secondaryColor,
+          activeColor: Theme.of(context).colorScheme.primary,
           textMain: gameColors.cardFrontTextDark,
         ),
         const SizedBox(height: 12),
@@ -916,7 +983,7 @@ class _GameRulesSection extends StatelessWidget {
           description: 'Show category hints to imposters',
           isEnabled: viewModel.settings.showImposterHints,
           onToggle: viewModel.toggleImposterHints,
-          activeColor: secondaryColor,
+          activeColor: Theme.of(context).colorScheme.primary,
           textMain: gameColors.cardFrontTextDark,
         ),
       ],
@@ -1303,145 +1370,145 @@ class _TappableButtonState extends State<_TappableButton>
       onTapCancel: _onTapCancel,
       onTap: widget.onTap,
       child: AnimatedBuilder(
-                animation: _scaleAnimation,
-                builder: (context, child) =>
-                    Transform.scale(scale: _scaleAnimation.value, child: child),
-                child: widget.child,
+        animation: _scaleAnimation,
+        builder: (context, child) =>
+            Transform.scale(scale: _scaleAnimation.value, child: child),
+        child: widget.child,
+      ),
+    );
+  }
+}
+
+class _HowToPlayCard extends StatelessWidget {
+  const _HowToPlayCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(32),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 40,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'How to Play',
+                style: textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.onSurface,
+                ),
               ),
-            );
-          }
-        }
-        
-        class _HowToPlayCard extends StatelessWidget {
-          const _HowToPlayCard();
-        
-            @override
-            Widget build(BuildContext context) {
-              final colorScheme = Theme.of(context).colorScheme;
-              final textTheme = Theme.of(context).textTheme;
-          
-              return Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(32),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.08),
-                      blurRadius: 40,
-                      offset: const Offset(0, 12),
-                    ),
-                  ],
+              IconButton(
+                onPressed: () => Navigator.of(context).pop(),
+                icon: Icon(Icons.close, color: colorScheme.outline),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          _buildStep(
+            context,
+            '1',
+            'Setup',
+            'Add players and choose a category.',
+            colorScheme.primary,
+          ),
+          const SizedBox(height: 20),
+          _buildStep(
+            context,
+            '2',
+            'Pass the Phone',
+            'Secrets revealed! Imposters get different words.',
+            colorScheme.secondary,
+          ),
+          const SizedBox(height: 20),
+          _buildStep(
+            context,
+            '3',
+            'Discuss',
+            'Describe your word without giving it away.',
+            colorScheme.tertiary,
+          ),
+          const SizedBox(height: 20),
+          _buildStep(
+            context,
+            '4',
+            'Vote',
+            'Eliminate the Imposter!',
+            colorScheme.error,
+          ),
+          const SizedBox(height: 12),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStep(
+    BuildContext context,
+    String number,
+    String title,
+    String description,
+    Color color,
+  ) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Center(
+            child: Text(
+              number,
+              style: textTheme.labelMedium?.copyWith(
+                color: color,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
                 ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'How to Play',
-                          style: textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: colorScheme.onSurface,
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          icon: Icon(Icons.close, color: colorScheme.outline),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    _buildStep(
-                      context,
-                      '1',
-                      'Setup',
-                      'Add players and choose a category.',
-                      colorScheme.primary,
-                    ),
-                    const SizedBox(height: 20),
-                    _buildStep(
-                      context,
-                      '2',
-                      'Pass the Phone',
-                      'Secrets revealed! Imposters get different words.',
-                      colorScheme.secondary,
-                    ),
-                    const SizedBox(height: 20),
-                    _buildStep(
-                      context,
-                      '3',
-                      'Discuss',
-                      'Describe your word without giving it away.',
-                      colorScheme.tertiary,
-                    ),
-                    const SizedBox(height: 20),
-                    _buildStep(
-                      context,
-                      '4',
-                      'Vote',
-                      'Eliminate the Imposter!',
-                      colorScheme.error,
-                    ),
-                    const SizedBox(height: 12),
-                  ],
+              ),
+              const SizedBox(height: 2),
+              Text(
+                description,
+                style: textTheme.labelSmall?.copyWith(
+                  color: Colors.grey.shade600,
                 ),
-              );
-            }
-                    Widget _buildStep(
-            BuildContext context,
-            String number,
-            String title,
-            String description,
-            Color color,
-          ) {
-            final textTheme = Theme.of(context).textTheme;
-        
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 28,
-                  height: 28,
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Center(
-                    child: Text(
-                      number,
-                      style: textTheme.labelMedium?.copyWith(
-                        color: color,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        description,
-                        style: textTheme.labelSmall?.copyWith(
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            );
-          }
-        }
-        
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}

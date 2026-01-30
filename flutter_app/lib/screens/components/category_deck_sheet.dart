@@ -101,7 +101,7 @@ class CategoryDeckSheet extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   scrollDirection: Axis.horizontal,
                   itemCount: selectedCategories.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  separatorBuilder: (_, _) => const SizedBox(width: 8),
                   itemBuilder: (context, index) {
                     final category = selectedCategories.elementAt(index);
                     return _DeckItemCard(

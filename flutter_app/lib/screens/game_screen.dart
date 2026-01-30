@@ -965,7 +965,6 @@ class _DiscussionViewState extends State<_DiscussionView>
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 if (!widget.imposterRevealed) ...[
-                  Spacer(flex: 1),
                   _TimerSection(
                     text: widget.timeLeft != null
                         ? _formatTime(widget.timeLeft!)
@@ -975,7 +974,7 @@ class _DiscussionViewState extends State<_DiscussionView>
                   ),
                 ],
                 Expanded(
-                  flex: widget.imposterRevealed ? 6 : 5,
+                  flex: widget.imposterRevealed ? 6 : 4,
                   child: widget.imposterRevealed
                       ? _ImposterRevealView(
                           animation: _revealController,
@@ -1027,8 +1026,9 @@ class _TimerSection extends StatelessWidget {
     final onSurface = Theme.of(context).colorScheme.onSurface;
 
     return Expanded(
-      flex: 1,
+      flex: 2,
       child: FittedBox(
+        fit: BoxFit.scaleDown,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [

@@ -181,16 +181,25 @@ class SetupViewModel extends ChangeNotifier {
   /// Returns the current category lists.
   Map<String, List<String>> get categoryLists => _wordRepository.categoryLists;
 
+  /// Returns the list of custom uploaded icon paths.
+  List<String> get customIconPaths => _wordRepository.customIconPaths;
+
+  /// Adds a new custom icon path to the global list.
+  void addCustomIconPath(String path) {
+    _wordRepository.addCustomIconPath(path);
+    notifyListeners();
+  }
+
   /// Adds a new category to the repository.
-  void addCategory(String name, List<String> words) {
-    _wordRepository.addCategory(name, words);
+  void addCategory(String name, List<String> words, {String? icon}) {
+    _wordRepository.addCategory(name, words, icon: icon);
     _syncSavedCategoryCount();
     notifyListeners();
   }
 
   /// Renames a category in the repository.
-  void renameCategory(String oldName, String newName, List<String> words) {
-    _wordRepository.renameCategory(oldName, newName, words);
+  void renameCategory(String oldName, String newName, List<String> words, {String? icon}) {
+    _wordRepository.renameCategory(oldName, newName, words, icon: icon);
     _syncSavedCategoryCount();
 
     // If renamed category was selected, replace with new one
@@ -201,6 +210,11 @@ class SetupViewModel extends ChangeNotifier {
       _settings = _settings.copyWith(selectedCategories: newSelected);
     }
     notifyListeners();
+  }
+
+  /// Returns the icon for a specific category.
+  String? getCategoryIcon(String category) {
+    return _wordRepository.getCategoryIcon(category);
   }
 
   /// Deletes a category from the repository.

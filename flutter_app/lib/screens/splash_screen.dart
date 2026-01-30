@@ -180,7 +180,7 @@ class _SplashScreenState extends State<SplashScreen>
                           child: Padding(
                             padding: const EdgeInsets.all(24.0),
                             child: Image.asset(
-                              'assets/images/sharksplash.png',
+                              'assets/images/shark.png',
                               fit: BoxFit.contain,
                             ),
                           ),
@@ -202,15 +202,19 @@ class _SplashScreenState extends State<SplashScreen>
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
-                              _loadingText,
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: textColor.withValues(alpha: 0.7),
-                                letterSpacing: 1.2,
+                            Expanded(
+                              child: Text(
+                                _loadingText,
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: textColor.withValues(alpha: 0.7),
+                                  letterSpacing: 1.2,
+                                ),
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
+                            const SizedBox(width: 8),
                             Text(
                               '${(_loadingProgress * 100).toInt()}%',
                               style: GoogleFonts.plusJakartaSans(

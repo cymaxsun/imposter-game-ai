@@ -239,6 +239,25 @@ class GameScreenColors extends ThemeExtension<GameScreenColors> {
 ///
 /// Provides both light and dark themes using Material 3 design principles.
 class AppTheme {
+  /// Default icons for standard categories.
+  static const Map<String, IconData> categoryIcons = {
+    'Space': Icons.rocket_launch,
+    'Desserts': Icons.bakery_dining,
+    'Food': Icons.bakery_dining,
+    'Fruits': Icons.bakery_dining,
+    'Animals': Icons.pets,
+    'Heroes': Icons.masks,
+    'Sports': Icons.sports_basketball,
+    'Travel': Icons.flight_takeoff,
+    'Movies': Icons.movie,
+    'Nature': Icons.forest,
+    'Science': Icons.science,
+    'Coffee': Icons.coffee,
+    'Music': Icons.music_note,
+    'Cars': Icons.directions_car,
+    'Emotions': Icons.emoji_emotions,
+  };
+
   static ThemeData get lightTheme {
     // --- Core Palette (Formerly LightPaletteClean) ---
     const Color surface = Color(0xFFF8FAFC); // iOS Background

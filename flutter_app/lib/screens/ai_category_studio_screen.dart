@@ -32,6 +32,7 @@ class AiCategoryResult {
     this.words,
     this.selectAfterSave = false,
     this.openGallery = false,
+    this.customIconPath,
   });
 
   /// The category name.
@@ -45,6 +46,9 @@ class AiCategoryResult {
 
   /// Whether the user requested to open the gallery (manage categories).
   final bool openGallery;
+
+  /// The path to a custom icon image, if any.
+  final String? customIconPath;
 }
 
 class _AiCategoryStudioScreenState extends State<AiCategoryStudioScreen> {
@@ -101,6 +105,7 @@ class _AiCategoryStudioScreenState extends State<AiCategoryStudioScreen> {
 
   bool _isLoading = false;
   String _errorMessage = '';
+  bool _useMockData = kDebugMode;
 
   Timer? _loadingTimer;
   int _loadingMessageIndex = 0;
@@ -170,6 +175,7 @@ class _AiCategoryStudioScreenState extends State<AiCategoryStudioScreen> {
     String name,
     List<String> words, {
     required bool selectAfterSave,
+    String? customIconPath,
   }) {
     if (!UsageService().canSaveCategory && !SubscriptionService().isPremium) {
       // Fixed: added isPremium check
@@ -200,6 +206,7 @@ class _AiCategoryStudioScreenState extends State<AiCategoryStudioScreen> {
         words: words,
         selectAfterSave: selectAfterSave,
         openGallery: true,
+        customIconPath: customIconPath,
       ),
     );
   }
@@ -307,8 +314,8 @@ class _AiCategoryStudioScreenState extends State<AiCategoryStudioScreen> {
 
     try {
       // START MOCK DATA CHANGE
-      // Only use mock data in debug mode
-      final bool useMockData = kDebugMode;
+      // Only use mock data in debug mode if toggled on
+      final bool useMockData = kDebugMode && _useMockData;
 
       List<String> words;
       if (useMockData) {
@@ -411,6 +418,26 @@ class _AiCategoryStudioScreenState extends State<AiCategoryStudioScreen> {
             ),
           ),
           actions: [
+            // Debug-only button to toggle mock data
+            if (kDebugMode)
+              IconButton(
+                icon: Icon(
+                  _useMockData ? Icons.bug_report : Icons.cloud_done,
+                  color: _useMockData ? Colors.orange : Colors.green,
+                ),
+                tooltip: _useMockData ? 'Using Mock Data' : 'Using Real Backend',
+                onPressed: () {
+                  setState(() {
+                    _useMockData = !_useMockData;
+                  });
+                  showIosSnackBar(
+                    context,
+                    _useMockData
+                        ? 'Debug: Switched to MOCK data'
+                        : 'Debug: Switched to REAL backend',
+                  );
+                },
+              ),
             // Debug-only button to reset daily limit
             if (kDebugMode)
               IconButton(

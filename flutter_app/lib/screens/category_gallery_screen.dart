@@ -1,6 +1,5 @@
 import 'dart:math';
-import 'dart:ui' as ui;
-import 'package:flutter/cupertino.dart';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -8,6 +7,7 @@ import 'edit_category_screen.dart';
 import 'ai_category_studio_screen.dart';
 import 'package:auto_size_text/auto_size_text.dart';
 import '../theme/pastel_theme.dart';
+import '../widgets/dashed_border_painter.dart';
 
 import '../services/usage_service.dart';
 import '../services/subscription_service.dart';
@@ -21,9 +21,12 @@ class CategoryGalleryScreen extends StatefulWidget {
   final Map<String, int> wordCounts;
   final ValueChanged<String> onDelete;
   final Map<String, List<String>> categoryLists;
-  final Future<void> Function(String, List<String>)? onCreate;
-  final Future<void> Function(String, String, List<String>)? onEdit;
+  final Future<void> Function(String, List<String>, {String? icon})? onCreate;
+  final Future<void> Function(String, String, List<String>, {String? icon})? onEdit;
   final ValueChanged<AiCategoryResult>? onResult;
+  final String? Function(String)? getCategoryIcon;
+  final List<String> customIconPaths;
+  final ValueChanged<String>? onCustomIconAdded;
 
   const CategoryGalleryScreen({
     super.key,
@@ -36,6 +39,9 @@ class CategoryGalleryScreen extends StatefulWidget {
     this.onCreate,
     this.onEdit,
     this.onResult,
+    this.getCategoryIcon,
+    this.customIconPaths = const [],
+    this.onCustomIconAdded,
   });
 
   @override
@@ -74,7 +80,7 @@ class _CategoryGalleryScreenState extends State<CategoryGalleryScreen>
     super.didUpdateWidget(oldWidget);
 
     // Sync available categories
-    if (widget.availableCategories.length !=
+    if (widget.availableCategories.length != 
             oldWidget.availableCategories.length ||
         !_areListsEqual(
           widget.availableCategories,
@@ -167,6 +173,7 @@ class _CategoryGalleryScreenState extends State<CategoryGalleryScreen>
     );
 
     if (confirmed) {
+      if (!mounted) return;
       _deleteCategory(category);
     }
   }
@@ -177,6 +184,11 @@ class _CategoryGalleryScreenState extends State<CategoryGalleryScreen>
   }
 
   Future<void> _navigateToEditor({String? categoryName}) async {
+    String? currentIconString;
+    if (categoryName != null) {
+      currentIconString = widget.getCategoryIcon?.call(categoryName);
+    }
+
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => EditCategoryScreen(
@@ -184,15 +196,22 @@ class _CategoryGalleryScreenState extends State<CategoryGalleryScreen>
           initialWords: categoryName != null
               ? widget.categoryLists[categoryName] ?? []
               : [],
-          onSave: (name, words) {
+          initialIcon: currentIconString,
+          customIconPaths: widget.customIconPaths,
+          onCustomIconAdded: widget.onCustomIconAdded,
+          onSave: (name, words, {icon, customIconPath}) {
+            // Convert icon data to string storage format
+            String? iconDataString;
+            if (customIconPath != null) {
+              iconDataString = 'path:$customIconPath';
+            } else if (icon != null) {
+              iconDataString = 'codePoint:${icon.codePoint}';
+            }
+
             if (categoryName == null) {
-              widget.onCreate?.call(name, words);
+              widget.onCreate?.call(name, words, icon: iconDataString);
             } else {
-              // This is the onEdit case.
-              // The actual logic for remembering selection and updating it
-              // should be handled by the parent's onEdit callback (widget.onEdit).
-              // This screen just passes the old and new names, and the words.
-              widget.onEdit?.call(categoryName, name, words);
+              widget.onEdit?.call(categoryName, name, words, icon: iconDataString);
             }
           },
         ),
@@ -210,6 +229,7 @@ class _CategoryGalleryScreenState extends State<CategoryGalleryScreen>
           ),
         )
         .then((result) {
+          if (!mounted) return;
           if (result != null && result is AiCategoryResult) {
             if (widget.onResult != null) {
               widget.onResult!(result);
@@ -232,7 +252,6 @@ class _CategoryGalleryScreenState extends State<CategoryGalleryScreen>
         return (widget.wordCounts[category] ?? 0) > 10;
       }
 
-      // Simple name matching for other chips
       return category == _selectedFilter;
     }).toList();
   }
@@ -266,18 +285,18 @@ class _CategoryGalleryScreenState extends State<CategoryGalleryScreen>
                     8,
                     24,
                     120,
-                  ), // Increased padding
+                  ),
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
-                    crossAxisSpacing: 20, // Increased spacing
-                    mainAxisSpacing: 20, // Increased spacing
+                    crossAxisSpacing: 20,
+                    mainAxisSpacing: 20,
                     childAspectRatio: 0.9,
                   ),
                   itemCount: filteredList.length + (_isEditMode ? 1 : 0),
                   itemBuilder: (context, index) {
                     if (_isEditMode && index == 0) {
-                      final canCreate =
-                          UsageService().canSaveCategory ||
+                      final canCreate = 
+                          UsageService().canSaveCategory || 
                           SubscriptionService().isPremium;
 
                       if (!canCreate) {
@@ -324,7 +343,6 @@ class _CategoryGalleryScreenState extends State<CategoryGalleryScreen>
                     final adjustedIndex = _isEditMode ? index - 1 : index;
                     final category = filteredList[adjustedIndex];
 
-                    // Cycle colors based on original index to keep stability
                     final colorIndex = widget.availableCategories.indexOf(
                       category,
                     );
@@ -346,6 +364,7 @@ class _CategoryGalleryScreenState extends State<CategoryGalleryScreen>
                             isSelected: _selectedCategories.contains(category),
                             isEditMode: _isEditMode,
                             color: color,
+                            iconDataString: widget.getCategoryIcon?.call(category),
                             onTap: () async {
                               if (_isEditMode) {
                                 await _navigateToEditor(categoryName: category);
@@ -391,7 +410,7 @@ class _CategoryGalleryScreenState extends State<CategoryGalleryScreen>
         right: 24,
       ),
       decoration: BoxDecoration(
-        color: Theme.of(context).scaffoldBackgroundColor.withOpacity(0.8),
+        color: Theme.of(context).scaffoldBackgroundColor.withValues(alpha: 0.8),
       ),
       child: Column(
         children: [
@@ -445,10 +464,10 @@ class _CategoryGalleryScreenState extends State<CategoryGalleryScreen>
           Container(
             height: 44,
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: Theme.of(context).colorScheme.primary.withOpacity(0.05),
+                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.05),
               ),
             ),
             padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -456,7 +475,7 @@ class _CategoryGalleryScreenState extends State<CategoryGalleryScreen>
               children: [
                 Icon(
                   Icons.search,
-                  color: Theme.of(context).colorScheme.primary.withOpacity(0.6),
+                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.6),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -469,7 +488,7 @@ class _CategoryGalleryScreenState extends State<CategoryGalleryScreen>
                         fontSize: 14,
                         color: Theme.of(
                           context,
-                        ).colorScheme.primary.withOpacity(0.4),
+                        ).colorScheme.primary.withValues(alpha: 0.4),
                       ),
                       isDense: true,
                     ),
@@ -483,7 +502,7 @@ class _CategoryGalleryScreenState extends State<CategoryGalleryScreen>
                     size: 18,
                     color: Theme.of(
                       context,
-                    ).colorScheme.primary.withOpacity(0.7),
+                    ).colorScheme.primary.withValues(alpha: 0.7),
                   ),
                   const SizedBox(width: 6),
                   ListenableBuilder(
@@ -499,7 +518,7 @@ class _CategoryGalleryScreenState extends State<CategoryGalleryScreen>
                           fontWeight: FontWeight.bold,
                           color: Theme.of(
                             context,
-                          ).colorScheme.primary.withOpacity(0.7),
+                          ).colorScheme.primary.withValues(alpha: 0.7),
                         ),
                       );
                     },
@@ -514,7 +533,7 @@ class _CategoryGalleryScreenState extends State<CategoryGalleryScreen>
               'Tap any card to edit its name or words',
               style: GoogleFonts.splineSans(
                 fontSize: 12,
-                color: Theme.of(context).colorScheme.primary.withOpacity(0.6),
+                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.6),
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -535,8 +554,8 @@ class _CategoryGalleryScreenState extends State<CategoryGalleryScreen>
           end: Alignment.topCenter,
           colors: [
             Theme.of(context).scaffoldBackgroundColor,
-            Theme.of(context).scaffoldBackgroundColor.withOpacity(0.8),
-            Theme.of(context).scaffoldBackgroundColor.withOpacity(0.0),
+            Theme.of(context).scaffoldBackgroundColor.withValues(alpha: 0.8),
+            Theme.of(context).scaffoldBackgroundColor.withValues(alpha: 0.0),
           ],
           stops: const [0.0, 0.5, 1.0],
         ),
@@ -552,7 +571,7 @@ class _CategoryGalleryScreenState extends State<CategoryGalleryScreen>
               borderRadius: BorderRadius.circular(20),
             ),
             elevation: 8,
-            shadowColor: Theme.of(context).colorScheme.primary.withOpacity(0.4),
+            shadowColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.4),
           ),
           child: Text(
             'Confirm Selection',
@@ -578,6 +597,7 @@ class _CategoryCard extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onDelete;
   final PastelTheme pastelTheme;
+  final String? iconDataString;
 
   const _CategoryCard({
     required this.category,
@@ -588,10 +608,19 @@ class _CategoryCard extends StatelessWidget {
     required this.onTap,
     required this.onDelete,
     required this.pastelTheme,
+    this.iconDataString,
   });
 
   IconData _getIcon() {
-    // Simple mapping for demo, would be dynamic in real app
+    // If we have a codePoint, use it
+    if (iconDataString != null && iconDataString!.startsWith('codePoint:')) {
+      try {
+        final codePoint = int.parse(iconDataString!.split(':')[1]);
+        return IconData(codePoint, fontFamily: 'MaterialIcons');
+      } catch (_) {}
+    }
+    
+    // Fallback to existing logic
     switch (category) {
       case 'Space':
         return Icons.rocket_launch;
@@ -626,6 +655,10 @@ class _CategoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Check if it's a custom image path
+    final isCustomImage = iconDataString != null && iconDataString!.startsWith('path:');
+    final imagePath = isCustomImage ? iconDataString!.substring(5) : null;
+
     return GestureDetector(
       onTap: onTap,
       child: Stack(
@@ -637,7 +670,7 @@ class _CategoryCard extends StatelessWidget {
               color: color,
               borderRadius: BorderRadius.circular(16),
               border: isEditMode
-                  ? null // Handled by CustomPaint
+                  ? null 
                   : (isSelected
                         ? Border.all(
                             color: Theme.of(context).colorScheme.primary,
@@ -648,7 +681,7 @@ class _CategoryCard extends StatelessWidget {
                   ? []
                   : [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
+                        color: Colors.black.withValues(alpha: 0.05),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
                       ),
@@ -656,8 +689,8 @@ class _CategoryCard extends StatelessWidget {
             ),
             child: CustomPaint(
               foregroundPainter: isEditMode
-                  ? _DashedBorderPainter(
-                      color: Colors.black.withOpacity(0.2),
+                  ? DashedBorderPainter(
+                      color: Colors.black.withValues(alpha: 0.2),
                       strokeWidth: 2,
                       gap: 6,
                     )
@@ -665,11 +698,27 @@ class _CategoryCard extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                    _getIcon(),
-                    size: 32,
-                    color: Colors.black.withOpacity(0.7),
-                  ),
+                  if (isCustomImage && imagePath != null)
+                     ClipRRect(
+                       borderRadius: BorderRadius.circular(8),
+                       child: Image.file(
+                         File(imagePath),
+                         width: 32,
+                         height: 32,
+                         fit: BoxFit.cover,
+                         errorBuilder: (context, error, stackTrace) => Icon(
+                           Icons.broken_image,
+                           size: 32,
+                           color: Colors.black.withValues(alpha: 0.7),
+                         ),
+                       ),
+                     )
+                  else
+                    Icon(
+                      _getIcon(),
+                      size: 32,
+                      color: Colors.black.withValues(alpha: 0.7),
+                    ),
                   const SizedBox(height: 8),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 4.0),
@@ -678,7 +727,7 @@ class _CategoryCard extends StatelessWidget {
                       style: GoogleFonts.splineSans(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
-                        color: Colors.black.withOpacity(0.8),
+                        color: Colors.black.withValues(alpha: 0.8),
                       ),
                       maxLines: 1,
                       minFontSize: 9,
@@ -690,7 +739,6 @@ class _CategoryCard extends StatelessWidget {
             ),
           ),
 
-          // Edit Mode: Delete Badge (Top Left)
           if (isEditMode)
             Positioned(
               top: -8,
@@ -701,10 +749,10 @@ class _CategoryCard extends StatelessWidget {
                 },
                 behavior: HitTestBehavior.opaque,
                 child: Container(
-                  width: 32, // Larger accessible touch target
+                  width: 32,
                   height: 32,
                   alignment: Alignment.topLeft,
-                  color: Colors.transparent, // Ensure it catches taps
+                  color: Colors.transparent,
                   child: Container(
                     width: 24,
                     height: 24,
@@ -713,7 +761,7 @@ class _CategoryCard extends StatelessWidget {
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
+                          color: Colors.black.withValues(alpha: 0.2),
                           blurRadius: 4,
                           offset: const Offset(0, 2),
                         ),
@@ -729,7 +777,6 @@ class _CategoryCard extends StatelessWidget {
               ),
             ),
 
-          // Select Mode: Badge Count (Top Right)
           if (!isEditMode)
             Positioned(
               top: 10,
@@ -737,7 +784,7 @@ class _CategoryCard extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.5),
+                  color: Colors.white.withValues(alpha: 0.5),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
@@ -745,13 +792,12 @@ class _CategoryCard extends StatelessWidget {
                   style: GoogleFonts.splineSans(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
-                    color: Colors.black.withOpacity(0.6),
+                    color: Colors.black.withValues(alpha: 0.6),
                   ),
                 ),
               ),
             ),
 
-          // Select Mode: Checkmark (Bottom Right)
           if (!isEditMode && isSelected)
             Positioned(
               bottom: 8,
@@ -784,7 +830,7 @@ class _CreateCategoryCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
       ),
       child: CustomPaint(
-        foregroundPainter: _DashedBorderPainter(
+        foregroundPainter: DashedBorderPainter(
           color: colorScheme.outline.withValues(alpha: 0.5),
           strokeWidth: 2,
           gap: 6,
@@ -815,46 +861,4 @@ class _CreateCategoryCard extends StatelessWidget {
       ),
     );
   }
-}
-
-class _DashedBorderPainter extends CustomPainter {
-  final Color color;
-  final double strokeWidth;
-  final double gap;
-
-  _DashedBorderPainter({
-    required this.color,
-    this.strokeWidth = 1.0,
-    this.gap = 5.0,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final Paint paint = Paint()
-      ..color = color
-      ..strokeWidth = strokeWidth
-      ..style = PaintingStyle.stroke;
-
-    final Path path = Path()
-      ..addRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTWH(0, 0, size.width, size.height),
-          const Radius.circular(16),
-        ),
-      );
-
-    for (final ui.PathMetric metric in path.computeMetrics()) {
-      double distance = 0.0;
-      while (distance < metric.length) {
-        final double len = gap;
-        if (distance + len < metric.length) {
-          canvas.drawPath(metric.extractPath(distance, distance + len), paint);
-        }
-        distance += (len * 2);
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
