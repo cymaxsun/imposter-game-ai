@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
+import 'dart:ui';
 
 import 'package:auto_size_text/auto_size_text.dart';
 import '../theme/app_theme.dart';
@@ -957,36 +958,45 @@ class _DiscussionViewState extends State<_DiscussionView>
     return Scaffold(
       backgroundColor: colorScheme.surface,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (!widget.imposterRevealed)
-                _TimerSection(
-                  text: widget.timeLeft != null
-                      ? _formatTime(widget.timeLeft!)
-                      : '--:--',
-                  progress: progress,
-                  timerAccent: timerAccent,
+        child: Center(
+          child: FractionallySizedBox(
+            widthFactor: 0.85,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (!widget.imposterRevealed) ...[
+                  Spacer(flex: 1),
+                  _TimerSection(
+                    text: widget.timeLeft != null
+                        ? _formatTime(widget.timeLeft!)
+                        : '--:--',
+                    progress: progress,
+                    timerAccent: timerAccent,
+                  ),
+                ],
+                Expanded(
+                  flex: widget.imposterRevealed ? 6 : 5,
+                  child: widget.imposterRevealed
+                      ? _ImposterRevealView(
+                          animation: _revealController,
+                          imposterNames: widget.imposterNames,
+                          imposterIndices: widget.imposterIndices,
+                          playerAvatars: widget.playerAvatars,
+                          secretWord: widget.secretWord,
+                          category: widget.category,
+                          onEndGame: widget.onEndGame,
+                        )
+                      : _WhoIsTheImposterSection(
+                          startingPlayer: _startingPlayer,
+                        ),
                 ),
-              Expanded(
-                flex: widget.imposterRevealed ? 6 : 4,
-                child: widget.imposterRevealed
-                    ? _ImposterRevealView(
-                        animation: _revealAnimation,
-                        imposterNames: widget.imposterNames,
-                        imposterIndices: widget.imposterIndices,
-                        playerAvatars: widget.playerAvatars,
-                        secretWord: widget.secretWord,
-                        category: widget.category,
-                        onEndGame: widget.onEndGame,
-                      )
-                    : _WhoIsTheImposterSection(startingPlayer: _startingPlayer),
-              ),
-              if (!widget.imposterRevealed)
-                _RevealButton(onReveal: widget.onReveal),
-            ],
+                if (!widget.imposterRevealed) ...[
+                  _RevealButton(onReveal: widget.onReveal),
+                ] else ...[
+                  _PlayAgainButton(onEndGame: widget.onEndGame),
+                ],
+              ],
+            ),
           ),
         ),
       ),
@@ -1106,26 +1116,15 @@ class _ImposterRevealView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
+    return Column(
       children: [
-        Positioned.fill(
+        Expanded(
+          flex: 4,
           child: AnimatedBuilder(
             animation: animation,
             builder: (context, child) {
-              return Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.08),
-                      blurRadius: 20,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24),
                 child: imposterNames.length == 1
                     ? _SingleImposterLayout(
                         name: imposterNames.first,
@@ -1146,7 +1145,7 @@ class _ImposterRevealView extends StatelessWidget {
             },
           ),
         ),
-        _PlayAgainButton(onEndGame: onEndGame),
+        
       ],
     );
   }
@@ -1172,7 +1171,15 @@ class _SingleImposterLayout extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _RevealTitle(namesCount: 1, animation: animation, isExpanded: true),
+        Flexible(
+          flex: 2,
+          child: _RevealTitle(
+            namesCount: 1,
+            animation: animation,
+            isExpanded: false,
+          ),
+        ),
+        const SizedBox(height: 16),
         Expanded(
           flex: 5,
           child: _SingleImposterCard(
@@ -1181,16 +1188,16 @@ class _SingleImposterLayout extends StatelessWidget {
             animation: animation,
           ),
         ),
-        const SizedBox(height: 16),
-        _RevealDivider(animation: animation),
-        const SizedBox(height: 16),
-        _RevealSecretInfo(
-          secretWord: secretWord,
-          category: category,
-          animation: animation,
-          isExpanded: true,
+        const SizedBox(height: 8),
+        Flexible(
+          flex: 2,
+          child: _RevealSecretInfo(
+            secretWord: secretWord,
+            category: category,
+            animation: animation,
+            isExpanded: false,
+          ),
         ),
-        const SizedBox(height: GameScreenConstants.scrollBottomPadding),
       ],
     );
   }
@@ -1215,46 +1222,111 @@ class _MultiImposterLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _RevealTitle(
-          namesCount: imposterNames.length,
-          animation: animation,
-          isExpanded: false,
-        ),
-        const SizedBox(height: 24),
-        Expanded(
-          flex: 5,
-          child: Center(
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: imposterNames.asMap().entries.map((entry) {
-                  return _ImposterNameCard(
-                    index: entry.key,
-                    name: entry.value,
-                    avatar: playerAvatars[imposterIndices[entry.key]],
-                    animation: animation,
-                    total: imposterNames.length,
-                  );
-                }).toList(),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Flexible(
+              flex: 2,
+              child: _RevealTitle(
+                namesCount: imposterNames.length,
+                animation: animation,
+                isExpanded: false,
               ),
             ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        _RevealDivider(animation: animation),
-        const SizedBox(height: 16),
-        _RevealSecretInfo(
-          secretWord: secretWord,
-          category: category,
-          animation: animation,
-          isExpanded: false,
-        ),
-        const SizedBox(height: GameScreenConstants.scrollBottomPadding),
-      ],
+            const SizedBox(height: 16),
+            Expanded(
+              flex: 5,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.primary.withValues(alpha: 0.03),
+                    borderRadius: BorderRadius.circular(32),
+                    border: Border.all(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.primary.withValues(alpha: 0.08),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: ShaderMask(
+                    shaderCallback: (Rect bounds) {
+                      return const LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Colors.white, Colors.transparent],
+                        stops: [0.8, 1.0],
+                      ).createShader(bounds);
+                    },
+                    blendMode: BlendMode.dstIn,
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.only(bottom: 24),
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          minWidth: constraints.maxWidth - 32,
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: imposterNames.asMap().entries.map((entry) {
+                            final index = entry.key;
+                            final delay = 0.2 + (index * 0.1);
+                            final itemAnimation = CurvedAnimation(
+                              parent: animation,
+                              curve: Interval(
+                                delay.clamp(0.0, 0.9),
+                                (delay + 0.4).clamp(0.1, 1.0),
+                                curve: Curves.easeOutBack,
+                              ),
+                            );
+
+                            return AnimatedBuilder(
+                              animation: itemAnimation,
+                              builder: (context, child) {
+                                final t = itemAnimation.value.clamp(0.0, 1.0);
+                                return Opacity(
+                                  opacity: t,
+                                  child: Transform.translate(
+                                    offset: Offset(0, 20 * (1 - t)),
+                                    child: _ImposterNameCard(
+                                      index: index,
+                                      name: entry.value,
+                                      avatar:
+                                          playerAvatars[imposterIndices[index]],
+                                      animation: animation,
+                                      total: imposterNames.length,
+                                    ),
+                                  ),
+                                );
+                              },
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Flexible(
+              flex: 2,
+              child: _RevealSecretInfo(
+                secretWord: secretWord,
+                category: category,
+                animation: animation,
+                isExpanded: false,
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -1272,34 +1344,59 @@ class _RevealTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Clamp to avoid curves potentially overshooting
-    final opacityValue = Interval(
-      0.0,
-      0.4,
-      curve: Curves.easeOut,
-    ).transform(animation.value.clamp(0.0, 1.0)).clamp(0.0, 1.0);
+    final opacityValue = CurvedAnimation(
+      parent: animation,
+      curve: const Interval(0.0, 0.4, curve: Curves.easeOut),
+    ).value;
 
-    final content = Opacity(
-      opacity: opacityValue,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8.0),
-        child: FittedBox(
-          fit: BoxFit.contain,
-          child: Text(
-            namesCount == 1 ? 'The Imposter\nwas...' : 'The Imposters\nwere...',
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: Theme.of(context).colorScheme.onSurface,
-              height: 1.1,
-            ),
-            textAlign: TextAlign.center,
+    final slideValue = CurvedAnimation(
+      parent: animation,
+      curve: const Interval(0.0, 0.6, curve: Curves.easeOutBack),
+    ).value;
+
+    final content = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: Opacity(
+        opacity: opacityValue,
+        child: Transform.translate(
+          offset: Offset(0, 10 * (1 - slideValue)),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                namesCount == 1 ? 'THE IMPOSTER' : 'THE IMPOSTERS',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.w900,
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.primary.withValues(alpha: 0.6),
+                  letterSpacing: 4,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 4),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  namesCount == 1 ? 'WAS REVEALED' : 'WERE REVEALED',
+                  style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                    fontWeight: FontWeight.w900,
+                    color: Theme.of(context).colorScheme.onSurface,
+                    letterSpacing: -1,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ],
           ),
         ),
       ),
     );
 
     if (isExpanded) {
-      return Expanded(flex: 2, child: content);
+      return Expanded(flex: 3, child: content);
     }
     return content;
   }
@@ -1318,51 +1415,60 @@ class _SingleImposterCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Clamp opacity to avoid errors with curves that overshoot
-    final opacityValue = Interval(
-      0.2,
-      0.5,
-      curve: Curves.easeOut,
-    ).transform(animation.value.clamp(0.0, 1.0)).clamp(0.0, 1.0);
+    final opacityValue = CurvedAnimation(
+      parent: animation,
+      curve: const Interval(0.2, 0.6, curve: Curves.easeOut),
+    ).value;
 
-    final scaleValue = Interval(
-      0.2,
-      0.6,
-      curve: Curves.elasticOut,
-    ).transform(animation.value.clamp(0.0, 1.0));
+    final scaleValue = CurvedAnimation(
+      parent: animation,
+      curve: const Interval(0.2, 0.8, curve: Curves.elasticOut),
+    ).value;
 
     return Opacity(
       opacity: opacityValue,
       child: Transform.scale(
         scale: scaleValue,
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Expanded(
-              flex: 4,
-              child: ClipRect(
-                child: Padding(
-                  padding: const EdgeInsets.all(8.0),
+              flex: 2,
+              child: AspectRatio(
+                aspectRatio: 1,
+                child: Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.primary.withValues(alpha: 0.1),
+                        blurRadius: 60,
+                        spreadRadius: 10,
+                      ),
+                    ],
+                  ),
                   child: Transform.scale(
-                    scale: 1.4,
+                    scale: 1.3,
                     child: Image.asset(avatar, fit: BoxFit.contain),
                   ),
                 ),
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             Expanded(
-              flex: 1,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: FittedBox(
-                  fit: BoxFit.contain,
+              child: FittedBox(
+                fit: BoxFit.contain,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Text(
-                    name,
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
+                    name.toUpperCase(),
+                    style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                      fontWeight: FontWeight.w900,
                       color: Theme.of(context).colorScheme.onSurface,
-                      height: 1.1,
+                      letterSpacing: 2,
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -1393,82 +1499,54 @@ class _ImposterNameCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Clamp opacity to avoid errors with curves that overshoot
-    final opacityValue = Interval(
-      (0.2 + (index * 0.05)).clamp(0.0, 0.9),
-      (0.5 + (index * 0.05)).clamp(0.1, 1.0),
-      curve: Curves.easeOut,
-    ).transform(animation.value.clamp(0.0, 1.0)).clamp(0.0, 1.0);
-
-    // elasticOut can overshoot, but scale handles values > 1.0 fine
-    final scaleValue = Interval(
-      (0.2 + (index * 0.05)).clamp(0.0, 0.9),
-      (0.6 + (index * 0.05)).clamp(0.1, 1.0),
-      curve: Curves.elasticOut,
-    ).transform(animation.value.clamp(0.0, 1.0));
-
-    return Opacity(
-      opacity: opacityValue,
-      child: Transform.scale(
-        scale: scaleValue,
-        child: Container(
-          margin: EdgeInsets.only(bottom: index < total - 1 ? 8 : 0),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.grey.shade100,
-            borderRadius: BorderRadius.circular(50),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                padding: const EdgeInsets.all(4),
-                decoration: const BoxDecoration(
-                  color: Color(0xFFFFE0E0),
-                  shape: BoxShape.circle,
-                ),
-                child: Transform.scale(
-                  scale: 1.2,
-                  child: Image.asset(avatar, fit: BoxFit.contain),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: AutoSizeText(
-                  name,
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                  maxLines: 1,
-                  minFontSize: 10,
-                ),
-              ),
-            ],
-          ),
+    return Container(
+      margin: EdgeInsets.only(bottom: index < total - 1 ? 12 : 0),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(40),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+          width: 1,
         ),
       ),
-    );
-  }
-}
-
-class _RevealDivider extends StatelessWidget {
-  final Animation<double> animation;
-
-  const _RevealDivider({required this.animation});
-
-  @override
-  Widget build(BuildContext context) {
-    final opacityValue = Interval(
-      0.5,
-      0.9,
-      curve: Curves.easeOut,
-    ).transform(animation.value.clamp(0.0, 1.0)).clamp(0.0, 1.0);
-
-    return Opacity(
-      opacity: opacityValue,
-      child: Divider(color: Colors.grey.shade200, thickness: 1),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Transform.scale(
+              scale: 1.1,
+              child: Image.asset(avatar, fit: BoxFit.contain),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: AutoSizeText(
+              name,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).colorScheme.onSurface,
+                letterSpacing: 0.5,
+              ),
+              maxLines: 1,
+              minFontSize: 10,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1488,29 +1566,69 @@ class _RevealSecretInfo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final opacityValue = Interval(
-      0.5,
-      0.9,
-      curve: Curves.easeOut,
-    ).transform(animation.value.clamp(0.0, 1.0)).clamp(0.0, 1.0);
+    final opacityValue = CurvedAnimation(
+      parent: animation,
+      curve: const Interval(0.6, 1.0, curve: Curves.easeOut),
+    ).value;
 
-    final content = Opacity(
-      opacity: opacityValue,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _InfoRow(label: 'SECRET WORD', value: secretWord),
-          if (category != null) ...[
-            const SizedBox(height: 12),
-            _InfoRow(label: 'CATEGORY', value: category!, isCategory: true),
-          ],
-        ],
+    final content = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+      child: Opacity(
+        opacity: opacityValue,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          decoration: BoxDecoration(
+            color: Theme.of(
+              context,
+            ).colorScheme.primary.withValues(alpha: 0.03),
+            borderRadius: BorderRadius.circular(32),
+            border: Border.all(
+              color: Theme.of(
+                context,
+              ).colorScheme.primary.withValues(alpha: 0.05),
+              width: 1,
+            ),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Flexible(
+                child: _InfoRow(
+                  label: 'SECRET WORD',
+                  value: secretWord,
+                  valueStyle: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w900,
+                    color: Theme.of(context).colorScheme.primary,
+                    letterSpacing: 1,
+                  ),
+                ),
+              ),
+              if (category != null) ...[
+                const SizedBox(height: 16),
+                Flexible(
+                  child: _InfoRow(
+                    label: 'CATEGORY',
+                    value: category!,
+                    isCategory: true,
+                    valueStyle: Theme.of(context).textTheme.titleMedium
+                        ?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.7),
+                        ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
       ),
     );
 
     if (isExpanded) {
-      return Expanded(flex: 2, child: content);
+      return Expanded(flex: 3, child: content);
     }
     return content;
   }
@@ -1625,53 +1743,37 @@ class _PlayAgainButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Positioned(
-      left: 0,
-      right: 0,
-      bottom: 0,
-      child: Container(
-        padding: const EdgeInsets.only(top: 16),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Theme.of(context).colorScheme.surface.withValues(alpha: 0.0),
-              Theme.of(context).colorScheme.surface,
-            ],
-            stops: const [0.0, 0.4],
-          ),
-        ),
-        child: FilledButton(
-          onPressed: onEndGame,
-          style: FilledButton.styleFrom(
-            backgroundColor: Theme.of(context).colorScheme.primary,
-            minimumSize: const Size(double.infinity, 56),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(
-                GameScreenConstants.buttonBorderRadius,
-              ),
+    return Container(
+      padding: const EdgeInsets.only(top: 16, bottom: 16),
+      child: FilledButton(
+        onPressed: onEndGame,
+        style: FilledButton.styleFrom(
+          backgroundColor: Theme.of(context).colorScheme.primary,
+          minimumSize: const Size(double.infinity, 56),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(
+              GameScreenConstants.buttonBorderRadius,
             ),
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(
-                Icons.refresh_rounded,
-                size: GameScreenConstants.buttonIconSize,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.refresh_rounded,
+              size: GameScreenConstants.buttonIconSize,
+              color: Colors.white,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Play Again',
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                fontWeight: FontWeight.bold,
                 color: Colors.white,
+                letterSpacing: 1,
               ),
-              const SizedBox(width: 8),
-              Text(
-                'Play Again',
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                  letterSpacing: 1,
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
